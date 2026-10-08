@@ -73,86 +73,13 @@ struct MealEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Photo (optional)") {
-                    if let photoData, let image = UIImage(data: photoData) {
-                        Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 180)
-                    }
-                    PhotosPicker(selection: $photoItem, matching: .images) { Label("Choose photo", systemImage: "photo") }.disabled(busy)
-                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                        Button { Task { await openCamera() } } label: { Label("Take photo", systemImage: "camera") }.disabled(busy)
-                    } else { Text("Camera unavailable here. Choose a photo instead.").font(.caption) }
-                    if loadingPhoto { ProgressView("Loading photo…") }
-                    if cameraDenied {
-                        Text("Camera access is disabled. You can still choose a photo or log manually.").font(.caption)
-                        Button("Open iPhone Settings") {
-                            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-                        }
-                    }
-                    if photoData != nil {
-                        Button(analyzing ? "Analyzing…" : analysisSettings.configuration.mode == .mock ? "Analyze with demo provider" : "Analyze food photo") {
-                            analysisTask = Task { await analyze() }
-                        }
-                            .disabled(busy)
-                        Button("Remove photo", role: .destructive) { flagPhotoChange(); photoData = nil; photoItem = nil }.disabled(busy)
-                    }
-                    if analysisSettings.configuration.mode == .mock {
-                        Text("Demo mode returns fixed example foods and never uploads the photo.").font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        Text("Analyze sends this photo to \(analysisSettings.configuration.endpointURL?.host ?? "the configured provider"). Review all estimates before saving.").font(.caption).foregroundStyle(.secondary)
-                    }
-                    NavigationLink("Configure provider & API key") { FoodAnalysisSettingsView() }.disabled(busy)
-                    if analyzing { ProgressView("Waiting for food estimates…") }
-                }
-                Section("Meal estimate — editable") {
-                    TextField("Food / meal name", text: $name)
-                    DatePicker("Eaten at", selection: $date, in: ...Date())
-                        .disabled(existing?.isBreakfast == true)
-                    if itemised {
-                        MetricRow(title: "Calories", value: "\(totalCalories.wholeText) kcal")
-                        MetricRow(title: "Protein", value: "\(totalProtein.wholeText) g")
-                        MetricRow(title: "Carbs", value: "\(totalCarbs.wholeText) g")
-                        MetricRow(title: "Fat", value: "\(totalFat.wholeText) g")
-                        Text("Totals update from the food items below. Edit each portion's calories/macros to correct the total.").font(.caption)
-                    } else {
-                        NumberField(title: "Calories (kcal)", value: $calories)
-                        NumberField(title: "Protein (g)", value: $protein)
-                        NumberField(title: "Carbs (g)", value: $carbs)
-                        NumberField(title: "Fat (g)", value: $fat)
-                    }
-                    Text("Use the meal name for portions, e.g. chicken 150 g + cooked rice 200 g. Macros can differ from calculated energy because labels and portions vary.").font(.caption)
-                }
-                .disabled(busy)
+                photoSection
+                mealEstimateSection.disabled(busy)
                 if itemised {
-                    Section("Detected foods — editable") {
-                        ForEach($estimatedItems) { $item in
-                            DisclosureGroup {
-                                FoodEstimateItemEditor(item: $item)
-                                Button("Remove this food", role: .destructive) {
-                                    let id = item.id
-                                    estimatedItems.removeAll { $0.id == id }
-                                    if estimatedItems.isEmpty { calories = 0; protein = 0; carbs = 0; fat = 0 }
-                                }
-                            } label: {
-                                VStack(alignment: .leading) {
-                                    Text(item.name.isEmpty ? "New food — enter details" : item.name)
-                                    Text("\(item.grams.wholeText) g · \(item.calories.wholeText) kcal · \(item.protein.wholeText) g protein").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        Button("Add a missing food") {
-                            estimatedItems.append(EstimatedFoodItem(name: "", grams: 0, calories: 0, protein: 0,
-                                carbs: 0, fat: 0, confidence: 0, uncertaintyNotes: "Added manually; verify portion and product labels."))
-                        }.disabled(estimatedItems.count >= 30)
-                        Text("Values are for the whole listed portion. Changing grams does not automatically rescale macros; edit the nutrition values too.").font(.caption)
-                    }.disabled(busy)
+                    detectedFoodsSection
                 }
                 if analysisSource != .manual || !analysisNotes.isEmpty {
-                    Section("Analysis — review before saving") {
-                        Text(analysisSource.label).foregroundStyle(analysisSource == .mock || analysisSource == .mockFallback ? .orange : .secondary)
-                        NumberField(title: "Overall confidence (0–1)", value: $analysisConfidence)
-                        TextField("Uncertainty / assumptions", text: $analysisNotes, axis: .vertical)
-                        Text("Confidence is an uncalibrated estimate. Check hidden oils, sauces and portion sizes. Every detected food can be edited or removed.").font(.caption)
-                    }.disabled(busy)
+                    analysisSection
                 }
                 if !name.isEmpty && !valid {
                     Section { Text("Check names and finite values: positive item grams (up to 10,000), nonnegative calories/macros, confidence 0–1 and notes up to 4,000 characters. Zero-calorie drinks can be logged.").font(.caption).foregroundStyle(.red) }
@@ -206,6 +133,94 @@ struct MealEditor: View {
                         else { error = "Could not save the photo. Try again or log manually." }
                     }
                 }
+        }
+    }
+
+    private var analysisSection: some View {
+        Section("Analysis — review before saving") {
+            Text(analysisSource.label).foregroundStyle(analysisSource == .mock || analysisSource == .mockFallback ? Color.orange : Color.secondary)
+            NumberField(title: "Overall confidence (0–1)", value: $analysisConfidence)
+            TextField("Uncertainty / assumptions", text: $analysisNotes, axis: .vertical)
+            Text("Confidence is an uncalibrated estimate. Check hidden oils, sauces and portion sizes. Every detected food can be edited or removed.").font(.caption)
+        }.disabled(busy)
+    }
+
+    private var detectedFoodsSection: some View {
+        Section("Detected foods — editable") {
+            ForEach($estimatedItems) { $item in
+                DisclosureGroup {
+                    FoodEstimateItemEditor(item: $item)
+                    Button("Remove this food", role: .destructive) {
+                        let id = item.id
+                        estimatedItems.removeAll { $0.id == id }
+                        if estimatedItems.isEmpty { calories = 0; protein = 0; carbs = 0; fat = 0 }
+                    }
+                } label: {
+                    VStack(alignment: .leading) {
+                        Text(item.name.isEmpty ? "New food — enter details" : item.name)
+                        Text("\(item.grams.wholeText) g · \(item.calories.wholeText) kcal · \(item.protein.wholeText) g protein").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Button("Add a missing food") {
+                estimatedItems.append(EstimatedFoodItem(name: "", grams: 0, calories: 0, protein: 0,
+                    carbs: 0, fat: 0, confidence: 0, uncertaintyNotes: "Added manually; verify portion and product labels."))
+            }.disabled(estimatedItems.count >= 30)
+            Text("Values are for the whole listed portion. Changing grams does not automatically rescale macros; edit the nutrition values too.").font(.caption)
+        }.disabled(busy)
+    }
+
+    private var mealEstimateSection: some View {
+        Section("Meal estimate — editable") {
+            TextField("Food / meal name", text: $name)
+            DatePicker("Eaten at", selection: $date, in: ...Date())
+                .disabled(existing?.isBreakfast == true)
+            if itemised {
+                MetricRow(title: "Calories", value: "\(totalCalories.wholeText) kcal")
+                MetricRow(title: "Protein", value: "\(totalProtein.wholeText) g")
+                MetricRow(title: "Carbs", value: "\(totalCarbs.wholeText) g")
+                MetricRow(title: "Fat", value: "\(totalFat.wholeText) g")
+                Text("Totals update from the food items below. Edit each portion's calories/macros to correct the total.").font(.caption)
+            } else {
+                NumberField(title: "Calories (kcal)", value: $calories)
+                NumberField(title: "Protein (g)", value: $protein)
+                NumberField(title: "Carbs (g)", value: $carbs)
+                NumberField(title: "Fat (g)", value: $fat)
+            }
+            Text("Use the meal name for portions, e.g. chicken 150 g + cooked rice 200 g. Macros can differ from calculated energy because labels and portions vary.").font(.caption)
+        }
+    }
+
+    private var photoSection: some View {
+        Section("Photo (optional)") {
+            if let photoData, let image = UIImage(data: photoData) {
+                Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 180)
+            }
+            PhotosPicker(selection: $photoItem, matching: .images) { Label("Choose photo", systemImage: "photo") }.disabled(busy)
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button { Task { await openCamera() } } label: { Label("Take photo", systemImage: "camera") }.disabled(busy)
+            } else { Text("Camera unavailable here. Choose a photo instead.").font(.caption) }
+            if loadingPhoto { ProgressView("Loading photo…") }
+            if cameraDenied {
+                Text("Camera access is disabled. You can still choose a photo or log manually.").font(.caption)
+                Button("Open iPhone Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }
+            }
+            if photoData != nil {
+                Button(analyzing ? "Analyzing…" : analysisSettings.configuration.mode == .mock ? "Analyze with demo provider" : "Analyze food photo") {
+                    analysisTask = Task { await analyze() }
+                }
+                    .disabled(busy)
+                Button("Remove photo", role: .destructive) { flagPhotoChange(); photoData = nil; photoItem = nil }.disabled(busy)
+            }
+            if analysisSettings.configuration.mode == .mock {
+                Text("Demo mode returns fixed example foods and never uploads the photo.").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Analyze sends this photo to \(analysisSettings.configuration.endpointURL?.host ?? "the configured provider"). Review all estimates before saving.").font(.caption).foregroundStyle(.secondary)
+            }
+            NavigationLink("Configure provider & API key") { FoodAnalysisSettingsView() }.disabled(busy)
+            if analyzing { ProgressView("Waiting for food estimates…") }
         }
     }
     @MainActor private func openCamera() async {

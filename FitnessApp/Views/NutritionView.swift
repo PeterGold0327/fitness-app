@@ -22,7 +22,7 @@ struct NutritionView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(meal.name).foregroundStyle(.primary)
                             if let source = FoodAnalysisSource(rawValue: meal.analysisSource), source != .manual && source != .recipe {
-                                Text(source.label).font(.caption).foregroundStyle(source == .mock || source == .mockFallback ? .orange : .secondary)
+                                Text(source.label).font(.caption).foregroundStyle(source == .mock || source == .mockFallback ? Color.orange : Color.secondary)
                             }
                             Text("\((meal.calories).wholeText) kcal · \((meal.protein).wholeText) g protein · \(meal.date.formatted(date: .omitted, time: .shortened))")
                                 .font(.caption).foregroundStyle(.secondary)

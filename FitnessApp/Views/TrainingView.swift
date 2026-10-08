@@ -11,57 +11,73 @@ struct TrainingView: View {
                 Button("Log badminton / add upcoming date") { sheet = .badminton }
                 Text("You own your plan. Suggestions never change it automatically.").font(.caption).foregroundStyle(.secondary)
             }
-            Section("Next-week suggestions") {
-                Text(store.weeklyVolumeAdvice)
-                ForEach(store.recentExerciseNames, id: \.self) { name in
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(name).font(.headline)
-                        Text(store.exerciseAdvice(name: name)).font(.subheadline)
-                    }
-                }
-            }
-            Section("Gym log") {
-                if store.workouts.isEmpty { Text("No workouts yet. Log your first-week plan to establish a baseline.").foregroundStyle(.secondary) }
-                ForEach(store.workouts) { session in
-                    DisclosureGroup {
-                        ForEach(session.exercises.sorted { $0.position < $1.position }) { exercise in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(exercise.name).font(.headline)
-                                Text("\(store.weightText(exercise.weightKG)) · \(exercise.sets) × \(exercise.reps) · target \(exercise.targetSets) × \(exercise.targetReps) · RPE \(exercise.rpe, specifier: "%.1f")")
-                                if !exercise.notes.isEmpty { Text(exercise.notes).foregroundStyle(.secondary) }
-                            }.font(.subheadline)
-                        }
-                        if let warning = FitnessLogic.legWarning(gymDate: session.date,
-                            heavyLegs: session.exercises.contains { $0.isLegExercise && $0.rpe >= 8 },
-                            badmintonDates: store.badmintonDates) { Text(warning).foregroundStyle(.orange) }
-                        Button("Edit session") { sheet = .workout(session) }
-                    } label: {
-                        VStack(alignment: .leading) {
-                            Text(session.name)
-                            Text(session.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .swipeActions { Button("Delete", role: .destructive) { store.deleteWorkout(session) } }
-                }
-            }
-            Section("Badminton dates") {
-                if store.badminton.isEmpty { Text("No dates logged.").foregroundStyle(.secondary) }
-                ForEach(store.badminton) { entry in
-                    Text(entry.day.formatted(date: .abbreviated, time: .omitted))
-                        .swipeActions { Button("Delete", role: .destructive) { store.deleteBadminton(entry) } }
-                }
-            }
-            Section("Apple Health workouts · last 7 days") {
-                if health.workouts.isEmpty { Text("No readable workouts. Connect Health in Settings.").foregroundStyle(.secondary) }
-                ForEach(health.workouts) { workout in
-                    VStack(alignment: .leading) {
-                        Text("\(workout.label) · \((workout.minutes).wholeText) min")
-                        Text(workout.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Text("Health activity informs meal suggestions and badminton warnings. Workouts stay read-only and separate from your gym sets and badminton dates. Log sets yourself for progression advice.").font(.caption)
-            }
+            suggestionsSection
+            gymLogSection
+            badmintonSection
+            healthWorkoutsSection
         }.navigationTitle("Training")
+    }
+
+    private var healthWorkoutsSection: some View {
+        Section("Apple Health workouts · last 7 days") {
+            if health.workouts.isEmpty { Text("No readable workouts. Connect Health in Settings.").foregroundStyle(.secondary) }
+            ForEach(health.workouts) { workout in
+                VStack(alignment: .leading) {
+                    Text("\(workout.label) · \((workout.minutes).wholeText) min")
+                    Text(workout.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Text("Health activity informs meal suggestions and badminton warnings. Workouts stay read-only and separate from your gym sets and badminton dates. Log sets yourself for progression advice.").font(.caption)
+        }
+    }
+
+    private var badmintonSection: some View {
+        Section("Badminton dates") {
+            if store.badminton.isEmpty { Text("No dates logged.").foregroundStyle(.secondary) }
+            ForEach(store.badminton) { entry in
+                Text(entry.day.formatted(date: .abbreviated, time: .omitted))
+                    .swipeActions { Button("Delete", role: .destructive) { store.deleteBadminton(entry) } }
+            }
+        }
+    }
+
+    private var gymLogSection: some View {
+        Section("Gym log") {
+            if store.workouts.isEmpty { Text("No workouts yet. Log your first-week plan to establish a baseline.").foregroundStyle(.secondary) }
+            ForEach(store.workouts) { session in
+                DisclosureGroup {
+                    ForEach(session.exercises.sorted { $0.position < $1.position }) { exercise in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(exercise.name).font(.headline)
+                            Text("\(store.weightText(exercise.weightKG)) · \(exercise.sets) × \(exercise.reps) · target \(exercise.targetSets) × \(exercise.targetReps) · RPE \(exercise.rpe, specifier: "%.1f")")
+                            if !exercise.notes.isEmpty { Text(exercise.notes).foregroundStyle(.secondary) }
+                        }.font(.subheadline)
+                    }
+                    if let warning = FitnessLogic.legWarning(gymDate: session.date,
+                        heavyLegs: session.exercises.contains { $0.isLegExercise && $0.rpe >= 8 },
+                        badmintonDates: store.badmintonDates) { Text(warning).foregroundStyle(.orange) }
+                    Button("Edit session") { sheet = .workout(session) }
+                } label: {
+                    VStack(alignment: .leading) {
+                        Text(session.name)
+                        Text(session.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .swipeActions { Button("Delete", role: .destructive) { store.deleteWorkout(session) } }
+            }
+        }
+    }
+
+    private var suggestionsSection: some View {
+        Section("Next-week suggestions") {
+            Text(store.weeklyVolumeAdvice)
+            ForEach(store.recentExerciseNames, id: \.self) { name in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(name).font(.headline)
+                    Text(store.exerciseAdvice(name: name)).font(.subheadline)
+                }
+            }
+        }
     }
 }
 
@@ -95,26 +111,9 @@ struct WorkoutEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Session") {
-                    TextField("Workout name", text: $name)
-                    DatePicker("Date", selection: $date, in: ...Date())
-                    Text("Use one row per exercise. Sets share the logged weight and reps; use another row for different loads.").font(.caption)
-                }
+                sessionSection
                 ForEach($exercises) { $exercise in
-                    Section("Exercise") {
-                        TextField("Exercise name", text: $exercise.name)
-                        NumberField(title: "Weight (\(store.profile.usesPounds ? "lb" : "kg"))", value: $exercise.displayedWeight)
-                        Stepper("Sets completed: \(exercise.sets)", value: $exercise.sets, in: 0...30)
-                        Stepper("Target sets: \(exercise.targetSets)", value: $exercise.targetSets, in: 1...30)
-                        Stepper("Reps completed per set: \(exercise.reps)", value: $exercise.reps, in: 0...100)
-                        Stepper("Target reps per set: \(exercise.targetReps)", value: $exercise.targetReps, in: 1...100)
-                        Stepper("RPE: \(exercise.rpe, specifier: "%.1f")", value: $exercise.rpe, in: 1...10, step: 0.5)
-                        Toggle("Leg exercise", isOn: $exercise.isLegExercise)
-                        TextField("Notes (optional)", text: $exercise.notes, axis: .vertical)
-                        if exercises.count > 1 {
-                            Button("Remove exercise", role: .destructive) { exercises.removeAll { $0.id == exercise.id } }
-                        }
-                    }
+                    exerciseSection($exercise)
                 }
                 Section { Button("Add exercise") { exercises.append(ExerciseDraft()) } }
                 if let warning = FitnessLogic.legWarning(gymDate: date,
@@ -138,6 +137,31 @@ struct WorkoutEditor: View {
                         }
                     }
                 }
+        }
+    }
+
+    private var sessionSection: some View {
+        Section("Session") {
+            TextField("Workout name", text: $name)
+            DatePicker("Date", selection: $date, in: ...Date())
+            Text("Use one row per exercise. Sets share the logged weight and reps; use another row for different loads.").font(.caption)
+        }
+    }
+    private func exerciseSection(_ binding: Binding<ExerciseDraft>) -> some View {
+        let exercise = binding.wrappedValue
+        return Section("Exercise") {
+            TextField("Exercise name", text: binding.name)
+            NumberField(title: "Weight (\(store.profile.usesPounds ? "lb" : "kg"))", value: binding.displayedWeight)
+            Stepper("Sets completed: \(exercise.sets)", value: binding.sets, in: 0...30)
+            Stepper("Target sets: \(exercise.targetSets)", value: binding.targetSets, in: 1...30)
+            Stepper("Reps completed per set: \(exercise.reps)", value: binding.reps, in: 0...100)
+            Stepper("Target reps per set: \(exercise.targetReps)", value: binding.targetReps, in: 1...100)
+            Stepper("RPE: \(exercise.rpe, specifier: "%.1f")", value: binding.rpe, in: 1...10, step: 0.5)
+            Toggle("Leg exercise", isOn: binding.isLegExercise)
+            TextField("Notes (optional)", text: binding.notes, axis: .vertical)
+            if exercises.count > 1 {
+                Button("Remove exercise", role: .destructive) { exercises.removeAll { $0.id == exercise.id } }
+            }
         }
     }
     private func save() {
