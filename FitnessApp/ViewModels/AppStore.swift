@@ -35,7 +35,7 @@ import Combine
         do {
             let profiles = try context.fetch(FetchDescriptor<UserProfile>())
             if let existing = profiles.first { profile = existing }
-            else { profile = UserProfile(); context.insert(profile) }
+            else { profile = UserProfile(); profile.name = L10n.text("Me"); context.insert(profile) }
             meals = try context.fetch(FetchDescriptor<Meal>(sortBy: [SortDescriptor(\.date, order: .reverse)]))
             weights = try context.fetch(FetchDescriptor<WeightEntry>(sortBy: [SortDescriptor(\.day)]))
             workouts = try context.fetch(FetchDescriptor<WorkoutSession>(sortBy: [SortDescriptor(\.date, order: .reverse)]))
@@ -56,7 +56,7 @@ import Combine
         } catch {
             context.rollback()
             isReady = false
-            errorMessage = "Could not load local data: \(error.localizedDescription). Your logs have not been deleted."
+            errorMessage = L10n.text("Could not load local data: %@. Your logs have not been deleted.", String(describing: error.localizedDescription))
         }
     }
 
@@ -65,7 +65,7 @@ import Combine
         catch {
             context.rollback()
             reload()
-            errorMessage = "Could not save changes: \(error.localizedDescription). Please try again."
+            errorMessage = L10n.text("Could not save changes: %@. Please try again.", String(describing: error.localizedDescription))
             return false
         }
     }
@@ -99,7 +99,7 @@ import Combine
         Calendar.current.date(byAdding: .day, value: -(days - 1), to: Calendar.current.startOfDay(for: currentDate))!
     }
     func weightText(_ kg: Double) -> String {
-        String(format: "%.1f %@", profile.usesPounds ? kg * 2.2046226218 : kg, profile.usesPounds ? "lb" : "kg")
+        String(format: "%.1f %@", locale: Locale.current, profile.usesPounds ? kg * 2.2046226218 : kg, profile.usesPounds ? L10n.text("lb") : L10n.text("kg"))
     }
     func kilograms(from displayed: Double) -> Double { profile.usesPounds ? displayed / 2.2046226218 : displayed }
     func displayedWeight(_ kg: Double) -> Double { profile.usesPounds ? kg * 2.2046226218 : kg }
@@ -108,13 +108,13 @@ import Combine
     @discardableResult func logMeal(_ meal: Meal) -> Bool {
         guard isReady, meal.date <= currentDate,
               EntryValidation.meal(name: meal.name, calories: meal.calories, protein: meal.protein, carbs: meal.carbs, fat: meal.fat) else {
-            return reject("Enter a meal name, valid nonnegative nutrition values and a date that is not in the future.")
+            return reject(L10n.text("Enter a meal name, valid nonnegative nutrition values and a date that is not in the future."))
         }
         guard meal.analysisNotes.count <= 4000,
               meal.analysisConfidence.map({ $0.isFinite && (0...1).contains($0) }) ?? true,
-              FoodAnalysisSource(rawValue: meal.analysisSource) != nil else { return reject("Check analysis confidence and notes.") }
+              FoodAnalysisSource(rawValue: meal.analysisSource) != nil else { return reject(L10n.text("Check analysis confidence and notes.")) }
         if meal.foods.contains(where: { $0.confidence != nil }) {
-            guard meal.foods.allSatisfy({ $0.confidence != nil }) else { return reject("Check all detected food items.") }
+            guard meal.foods.allSatisfy({ $0.confidence != nil }) else { return reject(L10n.text("Check all detected food items.")) }
             let items = meal.foods.map {
                 EstimatedFoodItem(name: $0.name, grams: $0.grams, calories: $0.calories, protein: $0.protein,
                     carbs: $0.carbs, fat: $0.fat, confidence: $0.confidence ?? 0, uncertaintyNotes: $0.uncertaintyNotes)
@@ -123,7 +123,7 @@ import Combine
                 uncertaintyNotes: meal.analysisNotes, source: FoodAnalysisSource(rawValue: meal.analysisSource) ?? .manual)
             guard estimate.valid, abs(estimate.calories - meal.calories) < 0.001,
                   abs(estimate.protein - meal.protein) < 0.001, abs(estimate.carbs - meal.carbs) < 0.001,
-                  abs(estimate.fat - meal.fat) < 0.001 else { return reject("Check detected foods and their combined meal totals.") }
+                  abs(estimate.fat - meal.fat) < 0.001 else { return reject(L10n.text("Check detected foods and their combined meal totals.")) }
         }
         context.insert(meal); return save()
     }
@@ -134,16 +134,16 @@ import Combine
         guard isReady, date <= currentDate,
               EntryValidation.meal(name: name, calories: calories, protein: protein, carbs: carbs, fat: fat),
               !meal.isBreakfast || Calendar.current.isDate(date, inSameDayAs: meal.date) else {
-            return reject("Check the meal name, date and nutrition values before saving.")
+            return reject(L10n.text("Check the meal name, date and nutrition values before saving."))
         }
         if !estimatedItems.isEmpty {
             let estimate = FoodEstimate(name: name, items: estimatedItems, confidence: confidence ?? 0, uncertaintyNotes: notes, source: source)
             guard estimate.valid, abs(estimate.calories - calories) < 0.001, abs(estimate.protein - protein) < 0.001,
                   abs(estimate.carbs - carbs) < 0.001, abs(estimate.fat - fat) < 0.001 else {
-                return reject("Check each detected food's grams, macros, confidence and notes. Meal totals must equal the food items.")
+                return reject(L10n.text("Check each detected food's grams, macros, confidence and notes. Meal totals must equal the food items."))
             }
         }
-        guard notes.count <= 4000, confidence.map({ $0.isFinite && (0...1).contains($0) }) ?? true else { return reject("Check analysis confidence and notes.") }
+        guard notes.count <= 4000, confidence.map({ $0.isFinite && (0...1).contains($0) }) ?? true else { return reject(L10n.text("Check analysis confidence and notes.")) }
         let oldFoods = meal.foods
         meal.foods = []
         for food in oldFoods { context.delete(food) }
@@ -164,7 +164,7 @@ import Combine
                   !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.weightKG <= 1000 &&
                   ExercisePerformance(date: date, weight: $0.weightKG, sets: $0.sets, reps: $0.reps,
                       targetReps: $0.targetReps, rpe: $0.rpe, targetSets: $0.targetSets).valid
-              }) else { return reject("Check exercise names, loads, completed/target sets and reps, and RPE before saving.") }
+              }) else { return reject(L10n.text("Check exercise names, loads, completed/target sets and reps, and RPE before saving.")) }
         let session = existing ?? WorkoutSession(date: date, name: name)
         if existing == nil { context.insert(session) }
         let oldExercises = session.exercises
@@ -183,7 +183,7 @@ import Combine
         guard isReady else { return false }
         if breakfast, todayMeals.contains(where: \.isBreakfast) { return true }
         guard EntryValidation.meal(name: option.name, calories: option.calories, protein: option.protein, carbs: option.carbs, fat: option.fat) else {
-            return reject("The meal estimate contains invalid values. Review your breakfast/target settings.")
+            return reject(L10n.text("The meal estimate contains invalid values. Review your breakfast/target settings."))
         }
         let meal = Meal(date: currentDate, name: option.name, calories: option.calories, protein: option.protein,
                         carbs: option.carbs, fat: option.fat, isBreakfast: breakfast)
@@ -203,7 +203,7 @@ import Combine
     }
     @discardableResult func logWeight(kilograms: Double, date: Date) -> Bool {
         guard isReady, EntryValidation.weight(kilograms), Calendar.current.startOfDay(for: date) <= currentDate else {
-            return reject("Enter a weight from 20 to 400 kg for today or an earlier date.")
+            return reject(L10n.text("Enter a weight from 20 to 400 kg for today or an earlier date."))
         }
         let day = Calendar.current.startOfDay(for: date)
         if let existing = weights.first(where: { Calendar.current.isDate($0.day, inSameDayAs: day) }) {
@@ -266,16 +266,16 @@ import Combine
     }
     func exerciseProgress(name: String) -> String {
         let sessions = workouts.filter { $0.date <= currentDate && $0.exercises.contains { $0.name.caseInsensitiveCompare(name) == .orderedSame } }
-        guard let latest = sessions.first else { return "No sessions logged." }
+        guard let latest = sessions.first else { return L10n.text("No sessions logged.") }
         let rows = latest.exercises.sorted { $0.position < $1.position }.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }
-        let details = rows.map { "\(weightText($0.weightKG)) · \($0.sets) × \($0.reps)" }.joined(separator: "; ")
-        guard sessions.count > 1 else { return "Latest: \(details). First session is your baseline." }
+        let details = rows.map { L10n.text("%@ · %@ × %@", String(describing: weightText($0.weightKG)), String(describing: $0.sets), String(describing: $0.reps)) }.joined(separator: "; ")
+        guard sessions.count > 1 else { return L10n.text("Latest: %@. First session is your baseline.", String(describing: details)) }
         func volume(_ session: WorkoutSession) -> Double {
             session.exercises.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }.reduce(0) { $0 + $1.weightKG * Double($1.sets) * Double($1.reps) }
         }
         let previous = volume(sessions[1]), latestVolume = volume(latest)
-        let change = previous > 0 ? String(format: "%+.0f%% volume vs previous session", (latestVolume - previous) / previous * 100) : "Previous loaded volume unavailable"
-        return "Latest: \(details). \(change). Volume reflects changes in sets as well as performance."
+        let change = previous > 0 ? L10n.text("%@ volume vs previous session", String(format: "%+.0f%%", locale: Locale.current, (latestVolume - previous) / previous * 100)) : L10n.text("Previous loaded volume unavailable")
+        return L10n.text("Latest: %@. %@. Volume reflects changes in sets as well as performance.", String(describing: details), String(describing: change))
     }
     var recentExerciseNames: [String] {
         let names = workouts.filter { $0.date >= startOfRecentDays(7) && $0.date <= currentDate }.flatMap { $0.exercises.map(\.name) }
@@ -285,10 +285,10 @@ import Combine
     }
     var weeklyVolumeAdvice: String {
         let sets = workouts.filter { $0.date >= startOfRecentDays(7) && $0.date <= currentDate }.flatMap(\.exercises).reduce(0) { $0 + $1.sets }
-        if sets == 0 { return "No completed sets logged this week. Record your own plan and review recovery if sessions were attempted." }
-        if sets < 10 { return "\(sets) total sets logged this week. Check whether your full plan has been recorded; volume may be low." }
-        if sets > 80 { return "\(sets) total sets logged this week. Volume may be high; review recovery and exercise overlap." }
-        return "\(sets) total sets logged this week. Keep your own plan and review exercise-specific advice."
+        if sets == 0 { return L10n.text("No completed sets logged this week. Record your own plan and review recovery if sessions were attempted.") }
+        if sets < 10 { return L10n.text("%@ total sets logged this week. Check whether your full plan has been recorded; volume may be low.", String(describing: sets)) }
+        if sets > 80 { return L10n.text("%@ total sets logged this week. Volume may be high; review recovery and exercise overlap.", String(describing: sets)) }
+        return L10n.text("%@ total sets logged this week. Keep your own plan and review exercise-specific advice.", String(describing: sets))
     }
     var weeklySummaryText: String {
         let start = startOfRecentDays(7)
@@ -298,9 +298,9 @@ import Combine
         let proteinAverage = loggedDays == 0 ? "—" : String(format: "%.0f", recent.reduce(0) { $0 + $1.protein } / Double(loggedDays))
         let gymCount = workouts.filter { $0.date >= start && $0.date <= currentDate }.count
         let dates = badminton.filter { $0.day >= start && $0.day <= currentDate }.map { $0.day.formatted(date: .abbreviated, time: .omitted) }.joined(separator: ", ")
-        let sleepText = recentSleepAverage.map { String(format: "%.1f h", $0) } ?? "No readable Health sleep"
-        let advice = recentExerciseNames.map { "\($0): \(exerciseProgress(name: $0))\n\(exerciseAdvice(name: $0))" }.joined(separator: "\n")
-        return "Last 7 calendar days\nNutrition recorded on \(loggedDays)/7 days\nAverage on logged days: \(calorieAverage) kcal · \(proteinAverage) g protein\nManually logged gym sessions: \(gymCount)\nBadminton: \(dates.isEmpty ? "None logged" : dates)\nAverage sleep (available nights): \(sleepText)\nWeight: \(trend.label)\n\(trend.advice)\n\(weeklyVolumeAdvice)\n\(advice)"
+        let sleepText = recentSleepAverage.map { L10n.text("%@ h", $0.formatted(.number.precision(.fractionLength(1)))) } ?? L10n.text("No readable Health sleep")
+        let advice = recentExerciseNames.map { L10n.text("%@: %@\n%@", String(describing: $0), String(describing: exerciseProgress(name: $0)), String(describing: exerciseAdvice(name: $0))) }.joined(separator: "\n")
+        return L10n.text("Last 7 calendar days\nNutrition recorded on %@/7 days\nAverage on logged days: %@ kcal · %@ g protein\nManually logged gym sessions: %@\nBadminton: %@\nAverage sleep (available nights): %@\nWeight: %@\n%@\n%@\n%@", String(describing: loggedDays), String(describing: calorieAverage), String(describing: proteinAverage), String(describing: gymCount), String(describing: dates.isEmpty ? L10n.text("None logged") : dates), String(describing: sleepText), String(describing: trend.label), String(describing: trend.advice), String(describing: weeklyVolumeAdvice), String(describing: advice))
     }
     func saveWeeklySummary() {
         let start = startOfRecentDays(7)

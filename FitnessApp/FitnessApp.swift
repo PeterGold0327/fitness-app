@@ -30,8 +30,8 @@ import SwiftData
             if let container = runtime.container, let store = runtime.store {
                 RootView().environmentObject(store).environmentObject(health).environmentObject(store.foodAnalysisSettings).modelContainer(container)
             } else {
-                ContentUnavailableView("Local storage could not open", systemImage: "externaldrive.badge.exclamationmark",
-                                       description: Text(runtime.startupError ?? "Please restart the app. Your data has not been deleted."))
+                ContentUnavailableView(L10n.text("Local storage could not open"), systemImage: "externaldrive.badge.exclamationmark",
+                                       description: Text(runtime.startupError ?? L10n.text("Please restart the app. Your data has not been deleted.")))
             }
         }
     }

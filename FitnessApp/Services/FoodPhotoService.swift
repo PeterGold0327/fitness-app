@@ -29,11 +29,11 @@ enum FoodAnalysisSource: String, Codable, Sendable {
     case manual, recipe, api, mock, mockFallback
     var label: String {
         switch self {
-        case .manual: return "Manual entry"
-        case .recipe: return "Recipe estimate"
-        case .api: return "AI photo estimate — review required"
-        case .mock: return "DEMO — not image recognition"
-        case .mockFallback: return "DEMO FALLBACK — API analysis did not succeed"
+        case .manual: return L10n.text("Manual entry")
+        case .recipe: return L10n.text("Recipe estimate")
+        case .api: return L10n.text("AI photo estimate — review required")
+        case .mock: return L10n.text("DEMO — not image recognition")
+        case .mockFallback: return L10n.text("DEMO FALLBACK — API analysis did not succeed")
         }
     }
 }
@@ -71,21 +71,21 @@ enum FoodAnalysisError: Error, LocalizedError, Equatable {
     case network, timeout, invalidResponse, refused, incomplete, noFoodDetected
     var errorDescription: String? {
         switch self {
-        case .missingCredential: return "No API key is stored for this endpoint. Add one in Settings → Food photo analysis, use demo mode, or enter the meal manually."
-        case .invalidConfiguration: return "Check the HTTPS API endpoint and vision model in Food photo analysis settings."
-        case .invalidImage: return "Choose a valid JPEG food photo, or log the meal manually."
-        case .imageTooLarge: return "This photo is too large. Choose a smaller image (up to 6 MB)."
-        case .unauthorized: return "The API rejected authentication or access. Check the stored key, project access and billing."
-        case .rateLimited: return "The API request limit or quota was reached. Check usage/billing, then retry later."
-        case .server: return "The AI service is temporarily unavailable. Retry later or enter the meal manually."
-        case .unexpectedStatus: return "The AI service returned an unexpected HTTP status. Check the provider configuration."
-        case .redirectRejected: return "The endpoint redirected the request. Use its final HTTPS API URL; credentials were not forwarded."
-        case .network: return "The photo could not reach the AI service. Check your connection or enter the meal manually."
-        case .timeout: return "Photo analysis timed out. Retry when ready or enter the meal manually."
-        case .invalidResponse: return "The AI response was missing usable food estimates. Retry or enter the meal manually."
-        case .refused: return "The AI service declined to analyze this image. Choose another photo or log manually."
-        case .incomplete: return "The AI response was incomplete. Retry or enter the meal manually."
-        case .noFoodDetected: return "No food could be identified. Choose a clearer food photo or log manually."
+        case .missingCredential: return L10n.text("No API key is stored for this endpoint. Add one in Settings → Food photo analysis, use demo mode, or enter the meal manually.")
+        case .invalidConfiguration: return L10n.text("Check the HTTPS API endpoint and vision model in Food photo analysis settings.")
+        case .invalidImage: return L10n.text("Choose a valid JPEG food photo, or log the meal manually.")
+        case .imageTooLarge: return L10n.text("This photo is too large. Choose a smaller image (up to 6 MB).")
+        case .unauthorized: return L10n.text("The API rejected authentication or access. Check the stored key, project access and billing.")
+        case .rateLimited: return L10n.text("The API request limit or quota was reached. Check usage/billing, then retry later.")
+        case .server: return L10n.text("The AI service is temporarily unavailable. Retry later or enter the meal manually.")
+        case .unexpectedStatus: return L10n.text("The AI service returned an unexpected HTTP status. Check the provider configuration.")
+        case .redirectRejected: return L10n.text("The endpoint redirected the request. Use its final HTTPS API URL; credentials were not forwarded.")
+        case .network: return L10n.text("The photo could not reach the AI service. Check your connection or enter the meal manually.")
+        case .timeout: return L10n.text("Photo analysis timed out. Retry when ready or enter the meal manually.")
+        case .invalidResponse: return L10n.text("The AI response was missing usable food estimates. Retry or enter the meal manually.")
+        case .refused: return L10n.text("The AI service declined to analyze this image. Choose another photo or log manually.")
+        case .incomplete: return L10n.text("The AI response was incomplete. Retry or enter the meal manually.")
+        case .noFoodDetected: return L10n.text("No food could be identified. Choose a clearer food photo or log manually.")
         }
     }
     var permitsDemoFallback: Bool {
@@ -100,9 +100,9 @@ enum FoodAnalysisMode: String, Codable, CaseIterable, Sendable {
     case mock, openAI, responsesCompatible
     var label: String {
         switch self {
-        case .mock: return "Demo (no upload)"
-        case .openAI: return "OpenAI"
-        case .responsesCompatible: return "Responses-compatible endpoint"
+        case .mock: return L10n.text("Demo (no upload)")
+        case .openAI: return L10n.text("OpenAI")
+        case .responsesCompatible: return L10n.text("Responses-compatible endpoint")
         }
     }
 }
@@ -186,7 +186,7 @@ struct ResponsesFoodPhotoAnalyzer: FoodPhotoAnalyzing {
         let body: [String: Any] = [
             "model": configuration.model, "store": false, "max_output_tokens": 5000,
             "input": [["role": "user", "content": [
-                ["type": "input_text", "text": Self.prompt],
+                ["type": "input_text", "text": Self.prompt + "\nReturn food names and uncertainty notes in \(L10n.responseLanguage). Keep JSON field names unchanged."],
                 ["type": "input_image", "image_url": "data:image/jpeg;base64,\(imageData.base64EncodedString())", "detail": "auto"]
             ]]],
             "text": ["format": ["type": "json_schema", "name": "food_estimate", "strict": true, "schema": Self.schema]]
@@ -269,12 +269,12 @@ struct MockFoodPhotoAnalyzer: FoodPhotoAnalyzing {
     func analyze(imageData: Data) async throws -> FoodEstimate {
         try Task.checkCancellation()
         guard !imageData.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return FoodEstimate(name: "Demo chicken & rice", items: [
-            EstimatedFoodItem(name: "Demo cooked chicken breast", grams: 150, calories: 248, protein: 46.5,
-                carbs: 0, fat: 5.4, confidence: 0, uncertaintyNotes: "Fixed example, not detected from this image."),
-            EstimatedFoodItem(name: "Demo cooked rice", grams: 200, calories: 260, protein: 5.4,
-                carbs: 56, fat: 0.6, confidence: 0, uncertaintyNotes: "Fixed example, not detected from this image.")
-        ], confidence: 0, uncertaintyNotes: "DEMO ONLY: this fixed result does not identify your photo. Edit every item using real portions/product labels before saving.", source: .mock)
+        return FoodEstimate(name: L10n.text("Demo chicken & rice"), items: [
+            EstimatedFoodItem(name: L10n.text("Demo cooked chicken breast"), grams: 150, calories: 248, protein: 46.5,
+                carbs: 0, fat: 5.4, confidence: 0, uncertaintyNotes: L10n.text("Fixed example, not detected from this image.")),
+            EstimatedFoodItem(name: L10n.text("Demo cooked rice"), grams: 200, calories: 260, protein: 5.4,
+                carbs: 56, fat: 0.6, confidence: 0, uncertaintyNotes: L10n.text("Fixed example, not detected from this image."))
+        ], confidence: 0, uncertaintyNotes: L10n.text("DEMO ONLY: this fixed result does not identify your photo. Edit every item using real portions/product labels before saving."), source: .mock)
     }
 }
 
@@ -291,7 +291,7 @@ struct FallbackFoodPhotoAnalyzer: FoodPhotoAnalyzing {
             guard enabled, let failure = error as? FoodAnalysisError, failure.permitsDemoFallback else { throw error }
             var result = try await fallback.analyze(imageData: imageData)
             result.source = .mockFallback
-            result.uncertaintyNotes = "DEMO FALLBACK: API analysis did not succeed. \(failure.localizedDescription)\n\(result.uncertaintyNotes)"
+            result.uncertaintyNotes = L10n.text("DEMO FALLBACK: API analysis did not succeed. %@\n%@", String(describing: failure.localizedDescription), String(describing: result.uncertaintyNotes))
             return result
         }
     }

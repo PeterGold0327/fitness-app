@@ -12,13 +12,13 @@ struct NumberField: View {
     var body: some View {
         VStack(alignment: .leading) {
             HStack {
-                Text(title)
+                Text(title).fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 TextField(title, text: $text)
                     .keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(minWidth: 90, maxWidth: 140)
                     .accessibilityLabel(title)
             }
-            if !value.isFinite { Text("Enter a valid number.").font(.caption).foregroundStyle(.red) }
+            if !value.isFinite { Text(L10n.text("Enter a valid number.")).font(.caption).foregroundStyle(.red) }
         }
         .onAppear { syncText() }
         .onChange(of: text) { _, input in value = NumericInput.parse(input, locale: locale) ?? .nan }
@@ -82,13 +82,13 @@ struct MealEditor: View {
                     analysisSection
                 }
                 if !name.isEmpty && !valid {
-                    Section { Text("Check names and finite values: positive item grams (up to 10,000), nonnegative calories/macros, confidence 0–1 and notes up to 4,000 characters. Zero-calorie drinks can be logged.").font(.caption).foregroundStyle(.red) }
+                    Section { Text(L10n.text("Check names and finite values: positive item grams (up to 10,000), nonnegative calories/macros, confidence 0–1 and notes up to 4,000 characters. Zero-calorie drinks can be logged.")).font(.caption).foregroundStyle(.red) }
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
-            }.navigationTitle(existing == nil ? "Log food" : "Edit meal").keyboardDoneButton()
+            }.navigationTitle(existing == nil ? L10n.text("Log food") : L10n.text("Edit meal")).keyboardDoneButton()
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { analysisTask?.cancel(); photoLoadTask?.cancel(); dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.disabled(!valid || busy || saving) }
+                    ToolbarItem(placement: .cancellationAction) { Button(L10n.text("Cancel")) { analysisTask?.cancel(); photoLoadTask?.cancel(); dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) { Button(L10n.text("Save")) { save() }.disabled(!valid || busy || saving) }
                 }
                 .interactiveDismissDisabled(loadingPhoto || requestingCamera)
                 .task {
@@ -118,10 +118,10 @@ struct MealEditor: View {
                             guard !Task.isCancelled else { return }
                             if let data, let normalized = MealPhoto.jpeg(data) {
                                 flagPhotoChange(); photoData = normalized
-                            } else { error = "This photo could not be read. Choose another image or log the meal manually." }
+                            } else { error = L10n.text("This photo could not be read. Choose another image or log the meal manually.") }
                         } catch {
                             guard !Task.isCancelled else { return }
-                            self.error = "Could not load photo: \(error.localizedDescription)"
+                            self.error = L10n.text("Could not load photo: %@", String(describing: error.localizedDescription))
                         }
                         loadingPhoto = false
                     }
@@ -130,97 +130,97 @@ struct MealEditor: View {
                 .sheet(isPresented: $showCamera) {
                     CameraPicker { image in
                         if let data = image.resizedForMeal()?.jpegData(compressionQuality: 0.8) { flagPhotoChange(); photoData = data }
-                        else { error = "Could not save the photo. Try again or log manually." }
+                        else { error = L10n.text("Could not save the photo. Try again or log manually.") }
                     }
                 }
         }
     }
 
     private var analysisSection: some View {
-        Section("Analysis — review before saving") {
+        Section(L10n.text("Analysis — review before saving")) {
             Text(analysisSource.label).foregroundStyle(analysisSource == .mock || analysisSource == .mockFallback ? Color.orange : Color.secondary)
-            NumberField(title: "Overall confidence (0–1)", value: $analysisConfidence)
-            TextField("Uncertainty / assumptions", text: $analysisNotes, axis: .vertical)
-            Text("Confidence is an uncalibrated estimate. Check hidden oils, sauces and portion sizes. Every detected food can be edited or removed.").font(.caption)
+            NumberField(title: L10n.text("Overall confidence (0–1)"), value: $analysisConfidence)
+            TextField(L10n.text("Uncertainty / assumptions"), text: $analysisNotes, axis: .vertical)
+            Text(L10n.text("Confidence is an uncalibrated estimate. Check hidden oils, sauces and portion sizes. Every detected food can be edited or removed.")).font(.caption)
         }.disabled(busy)
     }
 
     private var detectedFoodsSection: some View {
-        Section("Detected foods — editable") {
+        Section(L10n.text("Detected foods — editable")) {
             ForEach($estimatedItems) { $item in
                 DisclosureGroup {
                     FoodEstimateItemEditor(item: $item)
-                    Button("Remove this food", role: .destructive) {
+                    Button(L10n.text("Remove this food"), role: .destructive) {
                         let id = item.id
                         estimatedItems.removeAll { $0.id == id }
                         if estimatedItems.isEmpty { calories = 0; protein = 0; carbs = 0; fat = 0 }
                     }
                 } label: {
                     VStack(alignment: .leading) {
-                        Text(item.name.isEmpty ? "New food — enter details" : item.name)
-                        Text("\(item.grams.wholeText) g · \(item.calories.wholeText) kcal · \(item.protein.wholeText) g protein").font(.caption).foregroundStyle(.secondary)
+                        Text(item.name.isEmpty ? L10n.text("New food — enter details") : item.name)
+                        Text(L10n.text("%@ g · %@ kcal · %@ g protein", String(describing: item.grams.wholeText), String(describing: item.calories.wholeText), String(describing: item.protein.wholeText))).font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
-            Button("Add a missing food") {
+            Button(L10n.text("Add a missing food")) {
                 estimatedItems.append(EstimatedFoodItem(name: "", grams: 0, calories: 0, protein: 0,
-                    carbs: 0, fat: 0, confidence: 0, uncertaintyNotes: "Added manually; verify portion and product labels."))
+                    carbs: 0, fat: 0, confidence: 0, uncertaintyNotes: L10n.text("Added manually; verify portion and product labels.")))
             }.disabled(estimatedItems.count >= 30)
-            Text("Values are for the whole listed portion. Changing grams does not automatically rescale macros; edit the nutrition values too.").font(.caption)
+            Text(L10n.text("Values are for the whole listed portion. Changing grams does not automatically rescale macros; edit the nutrition values too.")).font(.caption)
         }.disabled(busy)
     }
 
     private var mealEstimateSection: some View {
-        Section("Meal estimate — editable") {
-            TextField("Food / meal name", text: $name)
-            DatePicker("Eaten at", selection: $date, in: ...Date())
+        Section(L10n.text("Meal estimate — editable")) {
+            TextField(L10n.text("Food / meal name"), text: $name)
+            DatePicker(L10n.text("Eaten at"), selection: $date, in: ...Date())
                 .disabled(existing?.isBreakfast == true)
             if itemised {
-                MetricRow(title: "Calories", value: "\(totalCalories.wholeText) kcal")
-                MetricRow(title: "Protein", value: "\(totalProtein.wholeText) g")
-                MetricRow(title: "Carbs", value: "\(totalCarbs.wholeText) g")
-                MetricRow(title: "Fat", value: "\(totalFat.wholeText) g")
-                Text("Totals update from the food items below. Edit each portion's calories/macros to correct the total.").font(.caption)
+                MetricRow(title: L10n.text("Calories"), value: L10n.text("%@ kcal", String(describing: totalCalories.wholeText)))
+                MetricRow(title: L10n.text("Protein"), value: L10n.text("%@ g", String(describing: totalProtein.wholeText)))
+                MetricRow(title: L10n.text("Carbs"), value: L10n.text("%@ g", String(describing: totalCarbs.wholeText)))
+                MetricRow(title: L10n.text("Fat"), value: L10n.text("%@ g", String(describing: totalFat.wholeText)))
+                Text(L10n.text("Totals update from the food items below. Edit each portion's calories/macros to correct the total.")).font(.caption)
             } else {
-                NumberField(title: "Calories (kcal)", value: $calories)
-                NumberField(title: "Protein (g)", value: $protein)
-                NumberField(title: "Carbs (g)", value: $carbs)
-                NumberField(title: "Fat (g)", value: $fat)
+                NumberField(title: L10n.text("Calories (kcal)"), value: $calories)
+                NumberField(title: L10n.text("Protein (g)"), value: $protein)
+                NumberField(title: L10n.text("Carbs (g)"), value: $carbs)
+                NumberField(title: L10n.text("Fat (g)"), value: $fat)
             }
-            Text("Use the meal name for portions, e.g. chicken 150 g + cooked rice 200 g. Macros can differ from calculated energy because labels and portions vary.").font(.caption)
+            Text(L10n.text("Use the meal name for portions, e.g. chicken 150 g + cooked rice 200 g. Macros can differ from calculated energy because labels and portions vary.")).font(.caption)
         }
     }
 
     private var photoSection: some View {
-        Section("Photo (optional)") {
+        Section(L10n.text("Photo (optional)")) {
             if let photoData, let image = UIImage(data: photoData) {
                 Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 180)
             }
-            PhotosPicker(selection: $photoItem, matching: .images) { Label("Choose photo", systemImage: "photo") }.disabled(busy)
+            PhotosPicker(selection: $photoItem, matching: .images) { Label(L10n.text("Choose photo"), systemImage: "photo") }.disabled(busy)
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button { Task { await openCamera() } } label: { Label("Take photo", systemImage: "camera") }.disabled(busy)
-            } else { Text("Camera unavailable here. Choose a photo instead.").font(.caption) }
-            if loadingPhoto { ProgressView("Loading photo…") }
+                Button { Task { await openCamera() } } label: { Label(L10n.text("Take photo"), systemImage: "camera") }.disabled(busy)
+            } else { Text(L10n.text("Camera unavailable here. Choose a photo instead.")).font(.caption) }
+            if loadingPhoto { ProgressView(L10n.text("Loading photo…")) }
             if cameraDenied {
-                Text("Camera access is disabled. You can still choose a photo or log manually.").font(.caption)
-                Button("Open iPhone Settings") {
+                Text(L10n.text("Camera access is disabled. You can still choose a photo or log manually.")).font(.caption)
+                Button(L10n.text("Open iPhone Settings")) {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                 }
             }
             if photoData != nil {
-                Button(analyzing ? "Analyzing…" : analysisSettings.configuration.mode == .mock ? "Analyze with demo provider" : "Analyze food photo") {
+                Button(analyzing ? L10n.text("Analyzing…") : analysisSettings.configuration.mode == .mock ? L10n.text("Analyze with demo provider") : L10n.text("Analyze food photo")) {
                     analysisTask = Task { await analyze() }
                 }
                     .disabled(busy)
-                Button("Remove photo", role: .destructive) { flagPhotoChange(); photoData = nil; photoItem = nil }.disabled(busy)
+                Button(L10n.text("Remove photo"), role: .destructive) { flagPhotoChange(); photoData = nil; photoItem = nil }.disabled(busy)
             }
             if analysisSettings.configuration.mode == .mock {
-                Text("Demo mode returns fixed example foods and never uploads the photo.").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.text("Demo mode returns fixed example foods and never uploads the photo.")).font(.caption).foregroundStyle(.secondary)
             } else {
-                Text("Analyze sends this photo to \(analysisSettings.configuration.endpointURL?.host ?? "the configured provider"). Review all estimates before saving.").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.text("Analyze sends this photo to %@. Review all estimates before saving.", String(describing: analysisSettings.configuration.endpointURL?.host ?? L10n.text("the configured provider")))).font(.caption).foregroundStyle(.secondary)
             }
-            NavigationLink("Configure provider & API key") { FoodAnalysisSettingsView() }.disabled(busy)
-            if analyzing { ProgressView("Waiting for food estimates…") }
+            NavigationLink(L10n.text("Configure provider & API key")) { FoodAnalysisSettingsView() }.disabled(busy)
+            if analyzing { ProgressView(L10n.text("Waiting for food estimates…")) }
         }
     }
     @MainActor private func openCamera() async {
@@ -246,11 +246,11 @@ struct MealEditor: View {
             carbs = estimate.carbs; fat = estimate.fat; estimatedItems = estimate.items
             analysisSource = estimate.source; analysisConfidence = estimate.confidence; analysisNotes = estimate.uncertaintyNotes
         } catch is CancellationError { return }
-        catch { self.error = "Analysis failed: \(error.localizedDescription). You can still enter the meal manually." }
+        catch { self.error = L10n.text("Analysis failed: %@. You can still enter the meal manually.", String(describing: error.localizedDescription)) }
     }
     private func flagPhotoChange() {
         guard analysisSource != .manual && photoData != nil else { return }
-        analysisNotes = "Photo changed/removed. Previous estimates are retained; verify them or analyze the new photo.\n" + String(analysisNotes.prefix(3700))
+        analysisNotes = L10n.text("Photo changed/removed. Previous estimates are retained; verify them or analyze the new photo.\n") + String(analysisNotes.prefix(3700))
     }
     private func save() {
         guard valid, !busy, !saving else { return }; saving = true
@@ -325,13 +325,13 @@ private enum MealPhoto {
 private struct FoodEstimateItemEditor: View {
     @Binding var item: EstimatedFoodItem
     var body: some View {
-        TextField("Detected food name", text: $item.name)
-        NumberField(title: "Estimated grams", value: $item.grams)
-        NumberField(title: "Item calories (kcal)", value: $item.calories)
-        NumberField(title: "Item protein (g)", value: $item.protein)
-        NumberField(title: "Item carbs (g)", value: $item.carbs)
-        NumberField(title: "Item fat (g)", value: $item.fat)
-        NumberField(title: "Item confidence (0–1)", value: $item.confidence)
-        TextField("Item uncertainty / assumptions", text: $item.uncertaintyNotes, axis: .vertical)
+        TextField(L10n.text("Detected food name"), text: $item.name)
+        NumberField(title: L10n.text("Estimated grams"), value: $item.grams)
+        NumberField(title: L10n.text("Item calories (kcal)"), value: $item.calories)
+        NumberField(title: L10n.text("Item protein (g)"), value: $item.protein)
+        NumberField(title: L10n.text("Item carbs (g)"), value: $item.carbs)
+        NumberField(title: L10n.text("Item fat (g)"), value: $item.fat)
+        NumberField(title: L10n.text("Item confidence (0–1)"), value: $item.confidence)
+        TextField(L10n.text("Item uncertainty / assumptions"), text: $item.uncertaintyNotes, axis: .vertical)
     }
 }

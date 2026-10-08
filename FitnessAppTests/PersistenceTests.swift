@@ -70,8 +70,8 @@ import SwiftData
             ExerciseEntry(name: "Squat", weightKG: 30, sets: 1, reps: 8, targetReps: 8, rpe: 7)
         ]
         XCTAssertTrue(app.save())
-        XCTAssertTrue(app.exerciseAdvice(name: "Squat").contains("adding 1–2.5 kg"))
-        XCTAssertFalse(app.exerciseAdvice(name: "Squat").contains("two consecutive"))
+        XCTAssertTrue(app.exerciseAdvice(name: "Squat").contains(L10n.text("Target reps completed at manageable RPE. Consider adding 1–2.5 kg next session.")))
+        XCTAssertFalse(app.exerciseAdvice(name: "Squat").contains(L10n.text("Recorded per-set performance dropped in two consecutive sessions. Check for planned lighter days; otherwise maintain or reduce load by 5–10% and review recovery.")))
     }
     func testBreakfastDisplaySnapshotAndMealChildrenSurviveReload() throws {
         let (container, app) = try makeStore()
@@ -141,12 +141,12 @@ import SwiftData
         let (container, app) = try makeStore()
         let first = ExerciseEntry(name: "Squat", weightKG: 40, sets: 2, reps: 8, targetReps: 8, rpe: 7, targetSets: 3)
         XCTAssertTrue(app.saveWorkout(nil, name: "Legs", date: .now, exercises: [first]))
-        XCTAssertTrue(app.exerciseAdvice(name: "squat").contains("Maintain"))
+        XCTAssertTrue(app.exerciseAdvice(name: "squat").contains(L10n.text("Maintain workload until target reps feel controlled. Reduce load if form or recovery suffers.")))
         let workout = app.workouts[0]
         let replacement = ExerciseEntry(name: "Squat", weightKG: 40, sets: 3, reps: 8, targetReps: 8, rpe: 7, targetSets: 3)
         XCTAssertTrue(app.saveWorkout(workout, name: "Legs", date: workout.date, exercises: [replacement]))
         XCTAssertEqual(try app.context.fetch(FetchDescriptor<ExerciseEntry>()).count, 1)
-        XCTAssertTrue(app.exerciseAdvice(name: "squat").contains("adding"))
+        XCTAssertTrue(app.exerciseAdvice(name: "squat").contains(L10n.text("Target reps completed at manageable RPE. Consider adding 1–2.5 kg next session.")))
         let reopened = AppStore(context: ModelContext(container))
         XCTAssertEqual(reopened.workouts.first?.exercises.first?.targetSets, 3)
         XCTAssertEqual(reopened.workouts.first?.exercises.first?.session?.id, workout.id)
@@ -160,13 +160,13 @@ import SwiftData
         XCTAssertFalse(app.manuallyTrainedToday)
         XCTAssertTrue(app.workouts.isEmpty)
         XCTAssertTrue(app.badminton.isEmpty)
-        XCTAssertTrue(app.recommendations.allSatisfy { $0.note.contains("activity") })
+        XCTAssertTrue(app.recommendations.allSatisfy { $0.note.contains(L10n.text(" Include carbs to support today's activity.")) })
     }
     func testSummaryCoverageAndSavedSnapshotAreNotZeroFilledOrDuplicated() throws {
         let (_, app) = try makeStore()
         XCTAssertTrue(app.logMeal(Meal(name: "Lunch", calories: 700, protein: 40)))
-        XCTAssertTrue(app.weeklySummaryText.contains("1/7 days"))
-        XCTAssertTrue(app.weeklySummaryText.contains("700 kcal"))
+        XCTAssertTrue(app.weeklySummaryText.contains("1/7"))
+        XCTAssertTrue(app.weeklySummaryText.contains(L10n.text("%@ kcal", "700")))
         app.saveWeeklySummary(); app.saveWeeklySummary()
         XCTAssertEqual(app.summaries.count, 1)
     }

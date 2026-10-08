@@ -21,7 +21,7 @@ final class QualityRegressionTests: XCTestCase {
     func testTrendBoundariesAreOnTargetDespiteFloatingPointNoise() {
         for gain in [0.1, 0.25] {
             let trend = FitnessLogic.weightTrend(trendPoints(gain: gain), now: now, calendar: calendar)
-            XCTAssertEqual(trend.label, "On target")
+            XCTAssertEqual(trend.label, L10n.text("On target"))
             XCTAssertNil(trend.calorieAdjustment)
         }
     }
@@ -46,26 +46,26 @@ final class QualityRegressionTests: XCTestCase {
     }
     func testIncompleteTargetSetsNeverSuggestIncrease() {
         let incomplete = ExercisePerformance(date: now, weight: 40, sets: 2, reps: 8, targetReps: 8, rpe: 7, targetSets: 3)
-        XCTAssertTrue(FitnessLogic.progression([incomplete]).contains("Maintain"))
+        XCTAssertTrue(FitnessLogic.progression([incomplete]).contains(L10n.text("Maintain workload until target reps feel controlled. Reduce load if form or recovery suffers.")))
     }
     func testFewerPlannedSetsAreNotTwoPerformanceDrops() {
         let entries = (0..<3).map { index in
             ExercisePerformance(date: now.addingTimeInterval(Double(index) * 86400), weight: 40,
                                 sets: 3 - index, reps: 8, targetReps: 8, rpe: 7, targetSets: 3 - index)
         }
-        XCTAssertFalse(FitnessLogic.progression(entries).contains("two consecutive"))
+        XCTAssertFalse(FitnessLogic.progression(entries).contains(L10n.text("Recorded per-set performance dropped in two consecutive sessions. Check for planned lighter days; otherwise maintain or reduce load by 5–10% and review recovery.")))
     }
     func testZeroCompletedSetsAndRepsDoNotSuggestIncrease() {
         let failed = ExercisePerformance(date: now, weight: 40, sets: 0, reps: 0, targetReps: 8, rpe: 10, targetSets: 3)
-        XCTAssertTrue(FitnessLogic.progression([failed]).contains("Maintain"))
+        XCTAssertTrue(FitnessLogic.progression([failed]).contains(L10n.text("Maintain workload until target reps feel controlled. Reduce load if form or recovery suffers.")))
     }
     func testInvalidPerformanceDoesNotBecomeARecommendation() {
         let invalid = ExercisePerformance(date: now, weight: .nan, sets: 3, reps: 8, targetReps: 8, rpe: 7)
-        XCTAssertTrue(FitnessLogic.progression([invalid]).contains("baseline"))
+        XCTAssertTrue(FitnessLogic.progression([invalid]).contains(L10n.text("Log a session to establish a baseline.")))
     }
     func testBodyweightExerciseSuggestsRepsInsteadOfKilograms() {
         let entry = ExercisePerformance(date: now, weight: 0, sets: 3, reps: 8, targetReps: 8, rpe: 7, targetSets: 3)
-        XCTAssertTrue(FitnessLogic.progression([entry]).contains("one more rep"))
+        XCTAssertTrue(FitnessLogic.progression([entry]).contains(L10n.text("Bodyweight targets completed. Try one more rep per set when comfortable.")))
     }
     func testNumericInputRejectsPartialOrUnusableValues() {
         for text in ["", " ", "12abc", "1e300", "NaN", "inf", "1.2.3", "1,000"] {
@@ -96,7 +96,7 @@ final class QualityRegressionTests: XCTestCase {
         let options = FitnessLogic.mealOptions(remainingCalories: 50, remainingProtein: 20, trained: false,
             badminton: false, inventory: [], trend: FitnessLogic.weightTrend([]))
         XCTAssertEqual(options.count, 3)
-        XCTAssertTrue(options.allSatisfy { $0.note.contains("exceeds") })
+        XCTAssertTrue(options.allSatisfy { $0.note.contains(L10n.text(" This normal portion exceeds today's remaining calorie target; reduce portions or review the meal before logging.")) })
     }
     func testSleepAttributedToWakingDayAndClippedAtRefreshTime() {
         let midnight = calendar.startOfDay(for: now)

@@ -44,7 +44,8 @@ struct MealOption: Identifiable {
     var protein: Double { ingredients.reduce(0) { $0 + $1.protein } }
     var carbs: Double { ingredients.reduce(0) { $0 + $1.carbs } }
     var fat: Double { ingredients.reduce(0) { $0 + $1.fat } }
-    var portionText: String { ingredients.map { "\($0.grams.formatted(.number.grouping(.never).precision(.fractionLength(0...1)))) g \($0.name)" }.joined(separator: " + ") }
+    var displayName: String { L10n.text(name) }
+    var portionText: String { ingredients.map { L10n.text("%@ g %@", $0.grams.formatted(.number.grouping(.never).precision(.fractionLength(0...1))), L10n.text($0.name)) }.joined(separator: " + ") }
 }
 
 struct Ingredient {
@@ -70,8 +71,8 @@ enum FitnessLogic {
     static func weightTrend(_ points: [WeightPoint], now: Date = .now, weeks: Int = 2,
                             calendar: Calendar = .current) -> WeightTrend {
         guard (2...4).contains(weeks) else {
-            return WeightTrend(average: nil, weeklyGain: nil, label: "Invalid comparison window",
-                               advice: "Use a two- or four-week comparison.", calorieAdjustment: nil)
+            return WeightTrend(average: nil, weeklyGain: nil, label: L10n.text("Invalid comparison window"),
+                               advice: L10n.text("Use a two- or four-week comparison."), calorieAdjustment: nil)
         }
         let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))!
         let recentStart = calendar.date(byAdding: .day, value: -7, to: end)!
@@ -87,49 +88,49 @@ enum FitnessLogic {
         let current = average(recent)
         guard weeks >= 2, recent.count >= 4, earlier.count >= 4,
               let current, let previous = average(earlier) else {
-            return WeightTrend(average: current, weeklyGain: nil, label: "More weigh-ins needed",
-                               advice: "Log at least 4 days in each comparison week. Targets stay unchanged.",
+            return WeightTrend(average: current, weeklyGain: nil, label: L10n.text("More weigh-ins needed"),
+                               advice: L10n.text("Log at least 4 days in each comparison week. Targets stay unchanged."),
                                calorieAdjustment: nil)
         }
         let gain = (current - previous) / Double(weeks - 1)
         if gain < 0.1 - 1e-9 {
-            return WeightTrend(average: current, weeklyGain: gain, label: "Too slow",
-                               advice: "Consider adding 175 kcal/day. Confirm in Settings; targets never change automatically.",
+            return WeightTrend(average: current, weeklyGain: gain, label: L10n.text("Too slow"),
+                               advice: L10n.text("Consider adding 175 kcal/day. Confirm in Settings; targets never change automatically."),
                                calorieAdjustment: 175)
         }
         if gain > 0.25 + 1e-9 {
-            return WeightTrend(average: current, weeklyGain: gain, label: "Too fast",
-                               advice: "Consider reducing by 125 kcal/day. Confirm in Settings; targets never change automatically.",
+            return WeightTrend(average: current, weeklyGain: gain, label: L10n.text("Too fast"),
+                               advice: L10n.text("Consider reducing by 125 kcal/day. Confirm in Settings; targets never change automatically."),
                                calorieAdjustment: -125)
         }
-        return WeightTrend(average: current, weeklyGain: gain, label: "On target",
-                           advice: "Keep calories the same. Aim for roughly 0.1–0.25 kg/week.", calorieAdjustment: nil)
+        return WeightTrend(average: current, weeklyGain: gain, label: L10n.text("On target"),
+                           advice: L10n.text("Keep calories the same. Aim for roughly 0.1–0.25 kg/week."), calorieAdjustment: nil)
     }
 
     static func progression(_ history: [ExercisePerformance]) -> String {
         let recent = history.filter(\.valid).sorted { $0.date < $1.date }.suffix(3)
-        guard let latest = recent.last else { return "Log a session to establish a baseline." }
+        guard let latest = recent.last else { return L10n.text("Log a session to establish a baseline.") }
         if recent.count == 3 {
             let entries = Array(recent)
             if entries[1].performance < entries[0].performance * 0.95 && entries[2].performance < entries[1].performance * 0.95 {
-                return "Recorded per-set performance dropped in two consecutive sessions. Check for planned lighter days; otherwise maintain or reduce load by 5–10% and review recovery."
+                return L10n.text("Recorded per-set performance dropped in two consecutive sessions. Check for planned lighter days; otherwise maintain or reduce load by 5–10% and review recovery.")
             }
         }
         if latest.completedTargets && latest.weight == 0 && latest.rpe <= 8 {
-            return "Bodyweight targets completed. Try one more rep per set when comfortable."
+            return L10n.text("Bodyweight targets completed. Try one more rep per set when comfortable.")
         }
         if latest.completedTargets && latest.rpe <= 8 {
-            return "Target reps completed at manageable RPE. Consider adding 1–2.5 kg next session."
+            return L10n.text("Target reps completed at manageable RPE. Consider adding 1–2.5 kg next session.")
         }
         if latest.completedTargets && latest.rpe < 9.5 {
-            return "Keep the weight and try one more rep per set when comfortable."
+            return L10n.text("Keep the weight and try one more rep per set when comfortable.")
         }
-        return "Maintain workload until target reps feel controlled. Reduce load if form or recovery suffers."
+        return L10n.text("Maintain workload until target reps feel controlled. Reduce load if form or recovery suffers.")
     }
 
     static func legWarning(gymDate: Date, heavyLegs: Bool, badmintonDates: [Date]) -> String? {
         guard heavyLegs, badmintonDates.contains(where: { abs($0.timeIntervalSince(gymDate)) <= 48 * 3600 }) else { return nil }
-        return "Badminton is within 48 hours of a heavy leg session. Consider a lighter leg day to protect court performance."
+        return L10n.text("Badminton is within 48 hours of a heavy leg session. Consider a lighter leg day to protect court performance.")
     }
 
     static func breakfast(yogurt: Double = 200, banana: Double = 120, oats: Double = 60) -> MealOption {
@@ -138,7 +139,7 @@ enum FitnessLogic {
             Ingredient(name: "Greek yogurt", grams: yogurt, caloriesPer100: 73, proteinPer100: 8.8, carbsPer100: 4, fatPer100: 2),
             Ingredient(name: "banana", grams: banana, caloriesPer100: 89, proteinPer100: 1.1, carbsPer100: 23, fatPer100: 0.3),
             Ingredient(name: "oats", grams: oats, caloriesPer100: 389, proteinPer100: 16.9, carbsPer100: 66, fatPer100: 6.9)
-        ], note: "Greek yogurt + banana + oats; check your product labels.")
+        ], note: L10n.text("Greek yogurt + banana + oats; check your product labels."))
     }
 
     static func mealOptions(remainingCalories: Double, remainingProtein: Double, trained: Bool,
@@ -152,14 +153,14 @@ enum FitnessLogic {
                 Ingredient(name: "rice (cooked)", grams: 220 * portion, caloriesPer100: 130, proteinPer100: 2.7, carbsPer100: 28, fatPer100: 0.3),
                 Ingredient(name: "frozen vegetables", grams: 150, caloriesPer100: 40, proteinPer100: 2, carbsPer100: 6, fatPer100: 0.5),
                 Ingredient(name: "olive oil", grams: 10 * portion, caloriesPer100: 884, proteinPer100: 0, carbsPer100: 0, fatPer100: 100)
-            ], note: "Easy Coles, Woolworths or Aldi staples."),
+            ], note: L10n.text("Easy Coles, Woolworths or Aldi staples.")),
             MealOption(name: "Eggs on toast + milk", ingredients: [
                 Ingredient(name: "eggs (without shell)", grams: 150 * proteinPortion, caloriesPer100: 143, proteinPer100: 12.6, carbsPer100: 0.7, fatPer100: 9.5),
                 Ingredient(name: "wholemeal bread", grams: 100 * portion, caloriesPer100: 247, proteinPer100: 13, carbsPer100: 41, fatPer100: 4.2),
                 Ingredient(name: "milk", grams: 250, caloriesPer100: 50, proteinPer100: 3.5, carbsPer100: 5, fatPer100: 1.8)
-            ], note: "Quick at-home option; no elaborate prep."),
+            ], note: L10n.text("Quick at-home option; no elaborate prep.")),
             MealOption(name: "Yogurt, oats & banana", ingredients: breakfast(yogurt: 250 * proteinPortion, banana: 120 * portion, oats: 60 * portion).ingredients,
-                       note: "An easy breakfast or snack from any Australian supermarket.")
+                       note: L10n.text("An easy breakfast or snack from any Australian supermarket."))
         ]
         let stocked = inventory.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         func stockCount(_ option: MealOption) -> Int {
@@ -175,13 +176,13 @@ enum FitnessLogic {
             return leftFit < rightFit
         }
         for index in options.indices {
-            if stockCount(options[index]) > 0 { options[index].note += " Uses food in your inventory." }
-            if activity { options[index].note += " Include carbs to support today's activity." }
-            if trend.calorieAdjustment != nil { options[index].note += " Weight trend: \(trend.label.lowercased()); review targets before changing them." }
+            if stockCount(options[index]) > 0 { options[index].note += L10n.text(" Uses food in your inventory.") }
+            if activity { options[index].note += L10n.text(" Include carbs to support today's activity.") }
+            if trend.calorieAdjustment != nil { options[index].note += L10n.text(" Weight trend: %@; review targets before changing them.", String(describing: trend.label.lowercased())) }
             if remainingCalories > 0 && options[index].calories > remainingCalories {
-                options[index].note += " This normal portion exceeds today's remaining calorie target; reduce portions or review the meal before logging."
+                options[index].note += L10n.text(" This normal portion exceeds today's remaining calorie target; reduce portions or review the meal before logging.")
             }
-            if remainingCalories <= 0 && remainingProtein <= 0 { options[index].note += " Daily targets are met; eat according to hunger." }
+            if remainingCalories <= 0 && remainingProtein <= 0 { options[index].note += L10n.text(" Daily targets are met; eat according to hunger.") }
         }
         return options
     }

@@ -42,8 +42,8 @@ struct KeychainFoodCredentials: FoodAnalysisCredentialStore {
         case unavailable, invalidKey
         var errorDescription: String? {
             switch self {
-            case .unavailable: return "The iPhone Keychain could not be accessed. Unlock the device and retry."
-            case .invalidKey: return "Enter a valid API key without spaces or control characters."
+            case .unavailable: return L10n.text("The iPhone Keychain could not be accessed. Unlock the device and retry.")
+            case .invalidKey: return L10n.text("Enter a valid API key without spaces or control characters.")
             }
         }
     }

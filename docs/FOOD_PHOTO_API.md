@@ -28,6 +28,6 @@ The HTTP layer uses an ephemeral session without cookies or cache, HTTPS endpoin
 
 ## Verification and remaining checks
 
-`bash scripts/test-core.sh` runs 56 portable tests, including 20 food API cases: complete parsing and computed totals, malformed/missing/negative/out-of-range data, response refusal/incompleteness/no-food, request/schema construction, HTTP failures, timeout/offline/cancellation, endpoint binding, and enabled/disabled fallback. Tests inject HTTP responses; they use no real key and make no paid API calls.
+`bash scripts/test-core.sh` runs 62 portable tests, including 20 food API cases: complete parsing and computed totals, malformed/missing/negative/out-of-range data, response refusal/incompleteness/no-food, request/schema construction, HTTP failures, timeout/offline/cancellation, endpoint binding, and enabled/disabled fallback. Tests inject HTTP responses; they use no real key and make no paid API calls.
 
 Four additional Apple-only tests cover item edit/reload/deduplication/validation and configuration persistence, credential replacement/removal and failed writes. The UI navigation suite includes the provider settings page. Run all Apple-platform tests in Xcode; Linux cannot validate SwiftUI, SwiftData migrations or actual Keychain behavior. Also verify photo upload with a real key/device, your project's model access, provider latency/cost, cancellation, and accuracy on your own meals. No live paid API call has been made in this workspace.

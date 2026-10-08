@@ -239,7 +239,7 @@ final class FoodPhotoAPITests: XCTestCase {
         let on = FallbackFoodPhotoAnalyzer(primary: FailingFoodAnalyzer(error: .network), fallback: demo, enabled: true)
         let result = try await on.analyze(imageData: image)
         XCTAssertEqual(result.source, .mockFallback)
-        XCTAssertTrue(result.explanation.contains("API analysis did not succeed"))
+        XCTAssertTrue(result.explanation.contains(FoodAnalysisError.network.localizedDescription))
         XCTAssertEqual(result.confidence, 0)
         let callsAfter = await demo.calls; XCTAssertEqual(callsAfter, 1)
     }
@@ -268,6 +268,6 @@ final class FoodPhotoAPITests: XCTestCase {
         let analyzer = try FoodAnalysisServiceFactory.make(configuration: configuration, credentials: credentials)
         let estimate = try await analyzer.analyze(imageData: image)
         XCTAssertEqual(estimate.source, .mockFallback)
-        XCTAssertTrue(estimate.explanation.contains("No API key"))
+        XCTAssertTrue(estimate.explanation.contains(FoodAnalysisError.missingCredential.localizedDescription))
     }
 }

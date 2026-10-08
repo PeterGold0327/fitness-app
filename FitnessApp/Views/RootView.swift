@@ -27,10 +27,10 @@ struct RootView: View {
             if store.isReady { tabs }
             else {
                 ContentUnavailableView {
-                    Label("Local logs could not load", systemImage: "externaldrive.badge.exclamationmark")
+                    Label(L10n.text("Local logs could not load"), systemImage: "externaldrive.badge.exclamationmark")
                 } description: {
-                    Text(store.errorMessage ?? "Please retry. Your logs have not been deleted.")
-                } actions: { Button("Retry loading") { store.reload() } }
+                    Text(store.errorMessage ?? L10n.text("Please retry. Your logs have not been deleted."))
+                } actions: { Button(L10n.text("Retry loading")) { store.reload() } }
             }
         }
         .storeErrorBanner()
@@ -60,15 +60,15 @@ struct RootView: View {
     private var tabs: some View {
         TabView {
             NavigationStack { HomeView(sheet: $sheet) }
-                .tabItem { Label("Home", systemImage: "house") }
+                .tabItem { Label(L10n.text("Home"), systemImage: "house") }
             NavigationStack { NutritionView(sheet: $sheet) }
-                .tabItem { Label("Nutrition", systemImage: "fork.knife") }
+                .tabItem { Label(L10n.text("Nutrition"), systemImage: "fork.knife") }
             NavigationStack { TrainingView(sheet: $sheet) }
-                .tabItem { Label("Training", systemImage: "dumbbell") }
+                .tabItem { Label(L10n.text("Training"), systemImage: "dumbbell") }
             NavigationStack { ProgressViewScreen(sheet: $sheet) }
-                .tabItem { Label("Progress", systemImage: "chart.xyaxis.line") }
+                .tabItem { Label(L10n.text("Progress"), systemImage: "chart.xyaxis.line") }
             NavigationStack { SettingsView() }
-                .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tabItem { Label(L10n.text("Settings"), systemImage: "gearshape") }
         }
         .tint(.teal)
     }
@@ -78,7 +78,12 @@ struct MetricRow: View {
     var title: String
     var value: String
     var body: some View {
-        HStack { Text(title); Spacer(); Text(value).foregroundStyle(.secondary).multilineTextAlignment(.trailing) }
+        HStack(alignment: .top) {
+            Text(title).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 12)
+            Text(value).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -86,13 +91,13 @@ struct NutritionTotals: View {
     @EnvironmentObject private var store: AppStore
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            MetricRow(title: "Calories", value: "\((store.calories).wholeText) / \((store.profile.calorieTarget).wholeText) kcal")
+            MetricRow(title: L10n.text("Calories"), value: L10n.text("%@ / %@ kcal", String(describing: (store.calories).wholeText), String(describing: (store.profile.calorieTarget).wholeText)))
             ProgressView(value: min(store.calories, store.profile.calorieTarget), total: max(1, store.profile.calorieTarget))
-            MetricRow(title: "Protein", value: "\((store.protein).wholeText) / \((store.profile.proteinTarget).wholeText) g")
+            MetricRow(title: L10n.text("Protein"), value: L10n.text("%@ / %@ g", String(describing: (store.protein).wholeText), String(describing: (store.profile.proteinTarget).wholeText)))
             ProgressView(value: min(store.protein, store.profile.proteinTarget), total: max(1, store.profile.proteinTarget))
-            Text("Remaining: \((store.remainingCalories).wholeText) kcal · \((store.remainingProtein).wholeText) g protein").font(.subheadline)
+            Text(L10n.text("Remaining: %@ kcal · %@ g protein", String(describing: (store.remainingCalories).wholeText), String(describing: (store.remainingProtein).wholeText))).font(.subheadline)
             if store.calories > store.profile.calorieTarget {
-                Text("\((store.calories - store.profile.calorieTarget).wholeText) kcal above target").font(.caption).foregroundStyle(.secondary)
+                Text(L10n.text("%@ kcal above target", String(describing: (store.calories - store.profile.calorieTarget).wholeText))).font(.caption).foregroundStyle(.secondary)
             }
         }.padding(.vertical, 6)
     }
@@ -103,24 +108,24 @@ struct BreakfastCard: View {
     @Binding var sheet: AppSheet?
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Breakfast · \(store.day.breakfastStatus.capitalized)").font(.headline)
+            Text(L10n.text("Breakfast · %@", String(describing: L10n.text(store.day.breakfastStatus.capitalized)))).font(.headline)
             if let meal = store.loggedBreakfast {
-                Text(meal.name).font(.subheadline)
-                Text("\(meal.calories.wholeText) kcal · \(meal.protein.wholeText) g protein").foregroundStyle(.secondary)
+                Text(meal.analysisSource == "recipe" ? L10n.text(meal.name) : meal.name).font(.subheadline)
+                Text(L10n.text("%@ kcal · %@ g protein", String(describing: meal.calories.wholeText), String(describing: meal.protein.wholeText))).foregroundStyle(.secondary)
             } else {
                 Text(store.breakfast.portionText).font(.subheadline)
-                Text("≈ \(store.breakfast.calories.wholeText) kcal · \(store.breakfast.protein.wholeText) g protein").foregroundStyle(.secondary)
+                Text(L10n.text("≈ %@ kcal · %@ g protein", String(describing: store.breakfast.calories.wholeText), String(describing: store.breakfast.protein.wholeText))).foregroundStyle(.secondary)
             }
             if store.day.breakfastStatus == "planned" {
-                Text("Planned breakfast is not counted until you mark it eaten.").font(.caption)
+                Text(L10n.text("Planned breakfast is not counted until you mark it eaten.")).font(.caption)
                 HStack {
-                    Button("Mark eaten") { store.logOption(store.breakfast, breakfast: true) }.buttonStyle(.borderedProminent)
-                    Button("Skip") { store.skipBreakfast() }.buttonStyle(.bordered)
+                    Button(L10n.text("Mark eaten")) { store.logOption(store.breakfast, breakfast: true) }.buttonStyle(.borderedProminent)
+                    Button(L10n.text("Skip")) { store.skipBreakfast() }.buttonStyle(.bordered)
                 }
             } else if store.day.breakfastStatus == "skipped" {
-                Button("Restore breakfast") { store.restoreBreakfast() }.buttonStyle(.bordered)
+                Button(L10n.text("Restore breakfast")) { store.restoreBreakfast() }.buttonStyle(.bordered)
             } else {
-                if let meal = store.loggedBreakfast { Button("Edit eaten breakfast") { sheet = .meal(meal) }.buttonStyle(.bordered) }
+                if let meal = store.loggedBreakfast { Button(L10n.text("Edit eaten breakfast")) { sheet = .meal(meal) }.buttonStyle(.bordered) }
             }
         }.padding(.vertical, 6)
     }
@@ -136,7 +141,7 @@ private struct StoreErrorBanner: ViewModifier {
                     Text(error).font(.callout)
                     Spacer()
                     Button { store.errorMessage = nil } label: { Image(systemName: "xmark") }
-                        .accessibilityLabel("Dismiss error")
+                        .accessibilityLabel(L10n.text("Dismiss error"))
                 }.padding().background(.regularMaterial)
             }
         }
@@ -149,7 +154,7 @@ extension View {
         toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+                Button(L10n.text("Done")) { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
             }
         }.scrollDismissesKeyboard(.interactively)
     }

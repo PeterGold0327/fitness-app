@@ -23,6 +23,17 @@ ui_sources = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "FitnessAppUITests
 file_ids = {p: file(p, 'sourcecode.swift') for p in app_sources + test_sources + ui_sources}
 resource_paths = ['FitnessApp/Resources/Info.plist', 'FitnessApp/Resources/FitnessApp.entitlements', 'FitnessApp/Resources/PrivacyInfo.xcprivacy']
 resource_ids = [file(p, 'text.plist.xml') for p in resource_paths]
+# Variant groups preserve .lproj directories and let iOS select the system language.
+for name in ['Localizable.strings', 'InfoPlist.strings']:
+    children = []
+    for language in ['en', 'zh-Hans']:
+        path = f'FitnessApp/Resources/{language}.lproj/{name}'
+        children.append(add('file:' + path,
+            f'isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = {q(language)}; path = {q(path)}; sourceTree = SOURCE_ROOT;'))
+    variant = add('localized:' + name,
+        f'isa = PBXVariantGroup; children = {refs(children)}; name = {q(name)}; sourceTree = "<group>";')
+    file_ids[name] = variant
+    resource_ids.append(variant)
 app_product = add('app-product', 'isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LeanLog.app; sourceTree = BUILT_PRODUCTS_DIR;')
 test_product = add('test-product', 'isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LeanLogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR;')
 app_group = add('app-group', f'isa = PBXGroup; children = {refs([file_ids[p] for p in app_sources] + resource_ids)}; name = FitnessApp; sourceTree = "<group>";')
@@ -36,7 +47,7 @@ def phase(key, isa, paths):
     builds = [add(f'build:{key}:{p}', f'isa = PBXBuildFile; fileRef = {file_ids[p] if p in file_ids else uid("file:" + p)};') for p in paths]
     return add(key, f'isa = {isa}; buildActionMask = 2147483647; files = {refs(builds)}; runOnlyForDeploymentPostprocessing = 0;')
 
-app_phases = [phase('app-sources', 'PBXSourcesBuildPhase', app_sources), phase('app-frameworks', 'PBXFrameworksBuildPhase', []), phase('app-resources', 'PBXResourcesBuildPhase', ['FitnessApp/Resources/PrivacyInfo.xcprivacy'])]
+app_phases = [phase('app-sources', 'PBXSourcesBuildPhase', app_sources), phase('app-frameworks', 'PBXFrameworksBuildPhase', []), phase('app-resources', 'PBXResourcesBuildPhase', ['FitnessApp/Resources/PrivacyInfo.xcprivacy', 'Localizable.strings', 'InfoPlist.strings'])]
 test_phases = [phase('test-sources', 'PBXSourcesBuildPhase', test_sources), phase('test-frameworks', 'PBXFrameworksBuildPhase', []), phase('test-resources', 'PBXResourcesBuildPhase', [])]
 
 ui_phases = [phase('ui-sources', 'PBXSourcesBuildPhase', ui_sources), phase('ui-frameworks', 'PBXFrameworksBuildPhase', []), phase('ui-resources', 'PBXResourcesBuildPhase', [])]
@@ -73,7 +84,7 @@ dependency = add('test-dependency', f'isa = PBXTargetDependency; target = {app_t
 test_target = add('test-target', f'isa = PBXNativeTarget; buildConfigurationList = {test_configs}; buildPhases = {refs(test_phases)}; buildRules = (); dependencies = {refs([dependency])}; name = LeanLogTests; productName = LeanLogTests; productReference = {test_product}; productType = "com.apple.product-type.bundle.unit-test";')
 ui_dependency = add('ui-dependency', f'isa = PBXTargetDependency; target = {app_target}; targetProxy = {proxy};')
 ui_target = add('ui-target', f'isa = PBXNativeTarget; buildConfigurationList = {ui_configs}; buildPhases = {refs(ui_phases)}; buildRules = (); dependencies = {refs([ui_dependency])}; name = LeanLogUITests; productName = LeanLogUITests; productReference = {ui_product}; productType = "com.apple.product-type.bundle.ui-testing";')
-project = add('project', f'''isa = PBXProject; attributes = {{ BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1600; TargetAttributes = {{ {app_target} = {{ CreatedOnToolsVersion = 16.0; SystemCapabilities = {{ com.apple.HealthKit = {{ enabled = 1; }}; }}; }}; {test_target} = {{ CreatedOnToolsVersion = 16.0; TestTargetID = {app_target}; }}; {ui_target} = {{ CreatedOnToolsVersion = 16.0; TestTargetID = {app_target}; }}; }}; }}; buildConfigurationList = {project_configs}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = {main_group}; productRefGroup = {products}; projectDirPath = ""; projectRoot = ""; targets = {refs([app_target, test_target, ui_target])};''')
+project = add('project', f'''isa = PBXProject; attributes = {{ BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1600; TargetAttributes = {{ {app_target} = {{ CreatedOnToolsVersion = 16.0; SystemCapabilities = {{ com.apple.HealthKit = {{ enabled = 1; }}; }}; }}; {test_target} = {{ CreatedOnToolsVersion = 16.0; TestTargetID = {app_target}; }}; {ui_target} = {{ CreatedOnToolsVersion = 16.0; TestTargetID = {app_target}; }}; }}; }}; buildConfigurationList = {project_configs}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, "zh-Hans", Base); mainGroup = {main_group}; productRefGroup = {products}; projectDirPath = ""; projectRoot = ""; targets = {refs([app_target, test_target, ui_target])};''')
 text = '// !$*UTF8*$!\n{\n archiveVersion = 1;\n classes = {};\n objectVersion = 56;\n objects = {\n'
 text += ''.join(f'  {key} = {{ {value} }};\n' for key, value in sorted(objects.items()))
 text += f' }};\n rootObject = {project};\n}}\n'

@@ -6,55 +6,55 @@ struct HomeView: View {
     @Binding var sheet: AppSheet?
     var body: some View {
         List {
-            Section("Today") { NutritionTotals() }
+            Section(L10n.text("Today")) { NutritionTotals() }
             Section { BreakfastCard(sheet: $sheet) }
             quickActionsSection
             activitySection
             if !health.requestedAccess {
-                Section("Apple Health") {
-                    NavigationLink("Connect Apple Health") { HealthPermissionsView() }
+                Section(L10n.text("Apple Health")) {
+                    NavigationLink(L10n.text("Connect Apple Health")) { HealthPermissionsView() }
                 }
             }
             nextStepSection
-        }.navigationTitle("Today")
+        }.navigationTitle(L10n.text("Today"))
         .refreshable { store.reload(); await health.refresh(into: store) }
     }
 
     private var nextStepSection: some View {
-        Section("Next step") {
+        Section(L10n.text("Next step")) {
             Text(store.trend.advice)
             if let option = store.recommendations.first {
-                Text("Try: \(option.name) · \(option.portionText)").font(.subheadline)
+                Text(L10n.text("Try: %@ · %@", String(describing: option.displayName), String(describing: option.portionText))).font(.subheadline)
             }
         }
     }
 
     private var activitySection: some View {
-        Section("Activity & recovery") {
-            MetricRow(title: "Gym today", value: store.manuallyTrainedToday ? "Logged" : store.trainedToday ? "Apple Health" : "Not logged")
-            MetricRow(title: "Badminton today", value: store.manuallyPlayedBadmintonToday ? "Logged" : store.badmintonToday ? "Apple Health" : "Not logged")
-            MetricRow(title: "Latest weight", value: store.weights.last.map { store.weightText($0.kilograms) } ?? "—")
-            if let weight = store.weights.last { Text("\(weight.day.formatted(date: .abbreviated, time: .omitted)) · \(weight.source)").font(.caption).foregroundStyle(.secondary) }
-            MetricRow(title: "7-day average", value: store.trend.average.map(store.weightText) ?? "—")
-            MetricRow(title: "Weight trend", value: store.trend.label)
-            MetricRow(title: "Last night's sleep", value: store.latestSleep.map { String(format: "%.1f h", $0.hours) } ?? "No readable data")
-            MetricRow(title: "Recent average sleep", value: store.recentSleepAverage.map { String(format: "%.1f h", $0) } ?? "—")
-            MetricRow(title: "Steps", value: health.steps.map { String(($0).wholeText) } ?? "—")
-            MetricRow(title: "Active calories", value: health.activeCalories.map { "\(($0).wholeText) kcal" } ?? "—")
-            MetricRow(title: "Latest heart rate today", value: health.heartRate.map { "\(($0).wholeText) bpm" } ?? "—")
-            Text("Weight and sleep may be locally cached from Health. Sleep uses noon-to-noon windows, including naps. Active calories are informational and are not added to your food target.")
+        Section(L10n.text("Activity & recovery")) {
+            MetricRow(title: L10n.text("Gym today"), value: store.manuallyTrainedToday ? L10n.text("Logged") : store.trainedToday ? L10n.text("Apple Health") : L10n.text("Not logged"))
+            MetricRow(title: L10n.text("Badminton today"), value: store.manuallyPlayedBadmintonToday ? L10n.text("Logged") : store.badmintonToday ? L10n.text("Apple Health") : L10n.text("Not logged"))
+            MetricRow(title: L10n.text("Latest weight"), value: store.weights.last.map { store.weightText($0.kilograms) } ?? L10n.text("—"))
+            if let weight = store.weights.last { Text(L10n.text("%@ · %@", String(describing: weight.day.formatted(date: .abbreviated, time: .omitted)), String(describing: L10n.text(weight.source)))).font(.caption).foregroundStyle(.secondary) }
+            MetricRow(title: L10n.text("7-day average"), value: store.trend.average.map(store.weightText) ?? L10n.text("—"))
+            MetricRow(title: L10n.text("Weight trend"), value: store.trend.label)
+            MetricRow(title: L10n.text("Last night's sleep"), value: store.latestSleep.map { L10n.text("%@ h", $0.hours.formatted(.number.precision(.fractionLength(1)))) } ?? L10n.text("No readable data"))
+            MetricRow(title: L10n.text("Recent average sleep"), value: store.recentSleepAverage.map { L10n.text("%@ h", $0.formatted(.number.precision(.fractionLength(1)))) } ?? L10n.text("—"))
+            MetricRow(title: L10n.text("Steps"), value: health.steps.map { String(($0).wholeText) } ?? L10n.text("—"))
+            MetricRow(title: L10n.text("Active calories"), value: health.activeCalories.map { L10n.text("%@ kcal", String(describing: ($0).wholeText)) } ?? L10n.text("—"))
+            MetricRow(title: L10n.text("Latest heart rate today"), value: health.heartRate.map { L10n.text("%@ bpm", String(describing: ($0).wholeText)) } ?? L10n.text("—"))
+            Text(L10n.text("Weight and sleep may be locally cached from Health. Sleep uses noon-to-noon windows, including naps. Active calories are informational and are not added to your food target."))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private var quickActionsSection: some View {
-        Section("Quick actions") {
-            Button { sheet = .meal(nil) } label: { Label("Log food", systemImage: "plus.circle") }
-            Button { sheet = .foodPhoto } label: { Label("Take food photo", systemImage: "camera") }
-            Button { sheet = .recommendations } label: { Label("What should I eat now?", systemImage: "fork.knife.circle") }
-            Button { sheet = .workout(nil) } label: { Label("Log gym workout", systemImage: "dumbbell") }
-            Button { sheet = .weight(nil) } label: { Label("Log weight", systemImage: "scalemass") }
-            Button { sheet = .badminton } label: { Label("Log badminton", systemImage: "figure.badminton") }
+        Section(L10n.text("Quick actions")) {
+            Button { sheet = .meal(nil) } label: { Label(L10n.text("Log food"), systemImage: "plus.circle") }
+            Button { sheet = .foodPhoto } label: { Label(L10n.text("Take food photo"), systemImage: "camera") }
+            Button { sheet = .recommendations } label: { Label(L10n.text("What should I eat now?"), systemImage: "fork.knife.circle") }
+            Button { sheet = .workout(nil) } label: { Label(L10n.text("Log gym workout"), systemImage: "dumbbell") }
+            Button { sheet = .weight(nil) } label: { Label(L10n.text("Log weight"), systemImage: "scalemass") }
+            Button { sheet = .badminton } label: { Label(L10n.text("Log badminton"), systemImage: "figure.badminton") }
         }
     }
 }

@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "LeanLog";
+"NSCameraUsageDescription" = "拍摄食物照片，附加到饮食记录，并核对营养估算。";
+"NSHealthShareUsageDescription" = "读取体重、睡眠、步数、活动消耗、心率和训练数据，帮助你进行个人健身记录。";

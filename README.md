@@ -21,6 +21,10 @@ The cloud machine is Linux. **The iOS app has not been compiled or launched with
 - **Settings:** profile and nutrition targets, breakfast portions, kg/lb display, inventory, Health access and food-photo API configuration.
 - **HealthKit:** read steps, active energy, latest heart rate today, recent workouts, weight and sleep; manual logging remains usable without Health access. Watch data is read via HealthKit, not a separate Watch app.
 
+## Languages
+
+English is the fallback; Simplified Chinese (`zh-Hans`) follows the iPhone language automatically. All app labels, generated coaching/summaries and camera/Health explanations have native localization resources. User-entered text and saved snapshots stay as recorded. See [localization checks and the iPhone layout checklist](docs/LOCALIZATION.md).
+
 ## MVP rules and limits
 
 - Each day starts with **planned** yogurt + banana + oats (200 / 120 / 60 g; about 486 kcal and 29 g protein). Mark eaten or skip it. Planned meals do not count toward intake, and breakfast cannot be logged twice. Edit an eaten breakfast in the food log.
@@ -71,7 +75,7 @@ xcodebuild -project FitnessApp.xcodeproj -scheme LeanLog \
   -derivedDataPath DerivedData test CODE_SIGNING_ALLOWED=NO
 ```
 
-**Quality pass:** 56 portable XCTest cases pass on Linux. Xcode also contains 19 SwiftData tests, 2 configuration tests and 4 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
+**Quality pass:** 62 portable XCTest cases pass on Linux. Xcode also contains 19 SwiftData tests, 2 configuration tests and 5 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
 
 Only if files are added/removed, regenerate project references using `python3 scripts/generate_project.py` (this replaces the generated project and scheme; preserve any custom signing/project settings first). Otherwise open the checked-in project directly.
 

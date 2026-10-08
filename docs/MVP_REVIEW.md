@@ -45,7 +45,7 @@ This review checked every source file, each tab/sheet/settings route, the SwiftD
 
 ## Executed checks
 
-- **56 portable XCTest cases passed**, zero failures: 20 original domain tests, 16 quality regressions and 20 food-photo API tests.
+- **62 portable XCTest cases passed**, zero failures: 20 original domain tests, 16 quality regressions, 20 food-photo API tests and 6 localization tests.
 - Portable tests compile real nutrition, trend, progression, input/validation, inventory and sleep-window logic; they do not assert that Apple integrations ran.
 - Swift parser accepted all app, unit-test and UI-test source files.
 - All Info/entitlement/privacy plists and the Xcode project parsed successfully. Every source file belongs to its intended target; target dependencies and shared unit/UI test references resolve.
@@ -55,7 +55,7 @@ This review checked every source file, each tab/sheet/settings route, the SwiftD
 
 - **19 SwiftData tests**: daily state/rollover, breakfast and ingredient snapshots, meal edits/deletion, manual/import weight precedence, repeated imports, validation, workout replacement/completion, inverse/cascade rules, rollback, summary coverage, row ordering and real file-backed reopening.
 - **2 configuration tests**: nonsecret preference persistence, key preservation/removal and failed credential writes using isolated preferences and injected fake credentials. Real device Keychain remains unverified.
-- **4 Xcode UI tests**: five-tab navigation, logging/recommendation sheets and cancel paths, food save/dashboard updates plus invalid-input gating, and settings subpage back navigation. Tests use a DEBUG-only in-memory launch flag; they never erase personal logs or request Health access automatically.
+- **5 Xcode UI tests**: five-tab navigation, logging/recommendation sheets and cancel paths, food save/dashboard updates plus invalid-input gating, and settings subpage back navigation. Tests use a DEBUG-only in-memory launch flag; they never erase personal logs or request Health access automatically.
 - Apple SDK compilation, code signing, provisioning and install/launch on iOS 17+. An Xcode build may still reveal framework/type-check issues that Linux parsing cannot detect.
 - Camera grant/denial, real photo picker, keyboard/focus behavior, chart rendering, VoiceOver/Dynamic Type and actual navigation gestures.
 - Real Health grant/partial/denied reads, authorization failures, unavailable Health, synced Apple Watch sleep/workouts, refresh after permission revocation and current-device calendar/timezone behavior.

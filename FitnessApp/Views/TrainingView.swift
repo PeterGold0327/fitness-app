@@ -7,69 +7,69 @@ struct TrainingView: View {
     var body: some View {
         List {
             Section {
-                Button("Log gym workout") { sheet = .workout(nil) }
-                Button("Log badminton / add upcoming date") { sheet = .badminton }
-                Text("You own your plan. Suggestions never change it automatically.").font(.caption).foregroundStyle(.secondary)
+                Button(L10n.text("Log gym workout")) { sheet = .workout(nil) }
+                Button(L10n.text("Log badminton / add upcoming date")) { sheet = .badminton }
+                Text(L10n.text("You own your plan. Suggestions never change it automatically.")).font(.caption).foregroundStyle(.secondary)
             }
             suggestionsSection
             gymLogSection
             badmintonSection
             healthWorkoutsSection
-        }.navigationTitle("Training")
+        }.navigationTitle(L10n.text("Training"))
     }
 
     private var healthWorkoutsSection: some View {
-        Section("Apple Health workouts · last 7 days") {
-            if health.workouts.isEmpty { Text("No readable workouts. Connect Health in Settings.").foregroundStyle(.secondary) }
+        Section(L10n.text("Apple Health workouts · last 7 days")) {
+            if health.workouts.isEmpty { Text(L10n.text("No readable workouts. Connect Health in Settings.")).foregroundStyle(.secondary) }
             ForEach(health.workouts) { workout in
                 VStack(alignment: .leading) {
-                    Text("\(workout.label) · \((workout.minutes).wholeText) min")
+                    Text(L10n.text("%@ · %@ min", String(describing: workout.label), String(describing: (workout.minutes).wholeText)))
                     Text(workout.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Text("Health activity informs meal suggestions and badminton warnings. Workouts stay read-only and separate from your gym sets and badminton dates. Log sets yourself for progression advice.").font(.caption)
+            Text(L10n.text("Health activity informs meal suggestions and badminton warnings. Workouts stay read-only and separate from your gym sets and badminton dates. Log sets yourself for progression advice.")).font(.caption)
         }
     }
 
     private var badmintonSection: some View {
-        Section("Badminton dates") {
-            if store.badminton.isEmpty { Text("No dates logged.").foregroundStyle(.secondary) }
+        Section(L10n.text("Badminton dates")) {
+            if store.badminton.isEmpty { Text(L10n.text("No dates logged.")).foregroundStyle(.secondary) }
             ForEach(store.badminton) { entry in
                 Text(entry.day.formatted(date: .abbreviated, time: .omitted))
-                    .swipeActions { Button("Delete", role: .destructive) { store.deleteBadminton(entry) } }
+                    .swipeActions { Button(L10n.text("Delete"), role: .destructive) { store.deleteBadminton(entry) } }
             }
         }
     }
 
     private var gymLogSection: some View {
-        Section("Gym log") {
-            if store.workouts.isEmpty { Text("No workouts yet. Log your first-week plan to establish a baseline.").foregroundStyle(.secondary) }
+        Section(L10n.text("Gym log")) {
+            if store.workouts.isEmpty { Text(L10n.text("No workouts yet. Log your first-week plan to establish a baseline.")).foregroundStyle(.secondary) }
             ForEach(store.workouts) { session in
                 DisclosureGroup {
                     ForEach(session.exercises.sorted { $0.position < $1.position }) { exercise in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(exercise.name).font(.headline)
-                            Text("\(store.weightText(exercise.weightKG)) · \(exercise.sets) × \(exercise.reps) · target \(exercise.targetSets) × \(exercise.targetReps) · RPE \(exercise.rpe, specifier: "%.1f")")
+                            Text(L10n.text("%@ · %@ × %@ · target %@ × %@ · RPE %@", String(describing: store.weightText(exercise.weightKG)), String(describing: exercise.sets), String(describing: exercise.reps), String(describing: exercise.targetSets), String(describing: exercise.targetReps), String(describing: String(format: "%.1f", locale: Locale.current, exercise.rpe))))
                             if !exercise.notes.isEmpty { Text(exercise.notes).foregroundStyle(.secondary) }
                         }.font(.subheadline)
                     }
                     if let warning = FitnessLogic.legWarning(gymDate: session.date,
                         heavyLegs: session.exercises.contains { $0.isLegExercise && $0.rpe >= 8 },
                         badmintonDates: store.badmintonDates) { Text(warning).foregroundStyle(.orange) }
-                    Button("Edit session") { sheet = .workout(session) }
+                    Button(L10n.text("Edit session")) { sheet = .workout(session) }
                 } label: {
                     VStack(alignment: .leading) {
                         Text(session.name)
                         Text(session.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                .swipeActions { Button("Delete", role: .destructive) { store.deleteWorkout(session) } }
+                .swipeActions { Button(L10n.text("Delete"), role: .destructive) { store.deleteWorkout(session) } }
             }
         }
     }
 
     private var suggestionsSection: some View {
-        Section("Next-week suggestions") {
+        Section(L10n.text("Next-week suggestions")) {
             Text(store.weeklyVolumeAdvice)
             ForEach(store.recentExerciseNames, id: \.self) { name in
                 VStack(alignment: .leading, spacing: 5) {
@@ -103,7 +103,7 @@ struct WorkoutEditor: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     var existing: WorkoutSession? = nil
-    @State private var name = "Gym"
+    @State private var name = L10n.text("Gym")
     @State private var date = Date()
     @State private var exercises = [ExerciseDraft()]
     @State private var loaded = false
@@ -115,16 +115,16 @@ struct WorkoutEditor: View {
                 ForEach($exercises) { $exercise in
                     exerciseSection($exercise)
                 }
-                Section { Button("Add exercise") { exercises.append(ExerciseDraft()) } }
+                Section { Button(L10n.text("Add exercise")) { exercises.append(ExerciseDraft()) } }
                 if let warning = FitnessLogic.legWarning(gymDate: date,
                     heavyLegs: exercises.contains { $0.isLegExercise && $0.rpe >= 8 }, badmintonDates: store.badmintonDates) {
-                    Section("Schedule suggestion") { Text(warning).foregroundStyle(.orange) }
+                    Section(L10n.text("Schedule suggestion")) { Text(warning).foregroundStyle(.orange) }
                 }
-            }.navigationTitle(existing == nil ? "Log workout" : "Edit workout").keyboardDoneButton()
+            }.navigationTitle(existing == nil ? L10n.text("Log workout") : L10n.text("Edit workout")).keyboardDoneButton()
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button(L10n.text("Cancel")) { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") { save() }.disabled(saving || exercises.isEmpty || !exercises.allSatisfy(\.valid) || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button(L10n.text("Save")) { save() }.disabled(saving || exercises.isEmpty || !exercises.allSatisfy(\.valid) || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
                 .task {
@@ -141,26 +141,26 @@ struct WorkoutEditor: View {
     }
 
     private var sessionSection: some View {
-        Section("Session") {
-            TextField("Workout name", text: $name)
-            DatePicker("Date", selection: $date, in: ...Date())
-            Text("Use one row per exercise. Sets share the logged weight and reps; use another row for different loads.").font(.caption)
+        Section(L10n.text("Session")) {
+            TextField(L10n.text("Workout name"), text: $name)
+            DatePicker(L10n.text("Date"), selection: $date, in: ...Date())
+            Text(L10n.text("Use one row per exercise. Sets share the logged weight and reps; use another row for different loads.")).font(.caption)
         }
     }
     private func exerciseSection(_ binding: Binding<ExerciseDraft>) -> some View {
         let exercise = binding.wrappedValue
-        return Section("Exercise") {
-            TextField("Exercise name", text: binding.name)
-            NumberField(title: "Weight (\(store.profile.usesPounds ? "lb" : "kg"))", value: binding.displayedWeight)
-            Stepper("Sets completed: \(exercise.sets)", value: binding.sets, in: 0...30)
-            Stepper("Target sets: \(exercise.targetSets)", value: binding.targetSets, in: 1...30)
-            Stepper("Reps completed per set: \(exercise.reps)", value: binding.reps, in: 0...100)
-            Stepper("Target reps per set: \(exercise.targetReps)", value: binding.targetReps, in: 1...100)
-            Stepper("RPE: \(exercise.rpe, specifier: "%.1f")", value: binding.rpe, in: 1...10, step: 0.5)
-            Toggle("Leg exercise", isOn: binding.isLegExercise)
-            TextField("Notes (optional)", text: binding.notes, axis: .vertical)
+        return Section(L10n.text("Exercise")) {
+            TextField(L10n.text("Exercise name"), text: binding.name)
+            NumberField(title: L10n.text("Weight (%@)", String(describing: store.profile.usesPounds ? L10n.text("lb") : L10n.text("kg"))), value: binding.displayedWeight)
+            Stepper(L10n.text("Sets completed: %@", String(describing: exercise.sets)), value: binding.sets, in: 0...30)
+            Stepper(L10n.text("Target sets: %@", String(describing: exercise.targetSets)), value: binding.targetSets, in: 1...30)
+            Stepper(L10n.text("Reps completed per set: %@", String(describing: exercise.reps)), value: binding.reps, in: 0...100)
+            Stepper(L10n.text("Target reps per set: %@", String(describing: exercise.targetReps)), value: binding.targetReps, in: 1...100)
+            Stepper(L10n.text("RPE: %@", String(describing: String(format: "%.1f", locale: Locale.current, exercise.rpe))), value: binding.rpe, in: 1...10, step: 0.5)
+            Toggle(L10n.text("Leg exercise"), isOn: binding.isLegExercise)
+            TextField(L10n.text("Notes (optional)"), text: binding.notes, axis: .vertical)
             if exercises.count > 1 {
-                Button("Remove exercise", role: .destructive) { exercises.removeAll { $0.id == exercise.id } }
+                Button(L10n.text("Remove exercise"), role: .destructive) { exercises.removeAll { $0.id == exercise.id } }
             }
         }
     }
@@ -184,12 +184,12 @@ struct BadmintonEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                DatePicker("Badminton date", selection: $date, displayedComponents: .date)
-                Text("One entry per day. Upcoming dates help flag heavy leg sessions nearby; only completed dates count toward weekly summaries.").font(.caption)
-            }.navigationTitle("Badminton")
+                DatePicker(L10n.text("Badminton date"), selection: $date, displayedComponents: .date)
+                Text(L10n.text("One entry per day. Upcoming dates help flag heavy leg sessions nearby; only completed dates count toward weekly summaries.")).font(.caption)
+            }.navigationTitle(L10n.text("Badminton"))
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) { Button("Save") { if store.logBadminton(date: date) { dismiss() } } }
+                    ToolbarItem(placement: .cancellationAction) { Button(L10n.text("Cancel")) { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) { Button(L10n.text("Save")) { if store.logBadminton(date: date) { dismiss() } } }
                 }
         }
     }

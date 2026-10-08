@@ -27,18 +27,18 @@ final class FitnessLogicTests: XCTestCase {
     }
     func testFlatWeightSuggestsIncrease() {
         let trend = FitnessLogic.weightTrend(points(gain: 0), now: now, calendar: calendar)
-        XCTAssertEqual(trend.label, "Too slow")
+        XCTAssertEqual(trend.label, L10n.text("Too slow"))
         XCTAssertEqual(trend.calorieAdjustment, 175)
     }
     func testSteadyLeanGainKeepsTargets() {
         let trend = FitnessLogic.weightTrend(points(gain: 0.18), now: now, calendar: calendar)
-        XCTAssertEqual(trend.label, "On target")
+        XCTAssertEqual(trend.label, L10n.text("On target"))
         XCTAssertEqual(trend.weeklyGain!, 0.18, accuracy: 0.001)
         XCTAssertNil(trend.calorieAdjustment)
     }
     func testRapidGainSuggestsReduction() {
         let trend = FitnessLogic.weightTrend(points(gain: 0.5), now: now, calendar: calendar)
-        XCTAssertEqual(trend.label, "Too fast")
+        XCTAssertEqual(trend.label, L10n.text("Too fast"))
         XCTAssertEqual(trend.calorieAdjustment, -125)
     }
     func testFourWeekRateIsNormalizedPerWeek() {
@@ -84,17 +84,17 @@ final class FitnessLogicTests: XCTestCase {
         ExercisePerformance(date: now.addingTimeInterval(offset), weight: weight, sets: 3, reps: reps, targetReps: 8, rpe: rpe)
     }
     func testManageableCompletedSetsSuggestLoadIncrease() {
-        XCTAssertTrue(FitnessLogic.progression([performance(weight: 40)]).contains("adding 1–2.5 kg"))
+        XCTAssertTrue(FitnessLogic.progression([performance(weight: 40)]).contains(L10n.text("Target reps completed at manageable RPE. Consider adding 1–2.5 kg next session.")))
     }
     func testChallengingCompletedSetsSuggestReps() {
-        XCTAssertTrue(FitnessLogic.progression([performance(weight: 40, rpe: 9)]).contains("one more rep"))
+        XCTAssertTrue(FitnessLogic.progression([performance(weight: 40, rpe: 9)]).contains(L10n.text("Keep the weight and try one more rep per set when comfortable.")))
     }
     func testTwoDropsSuggestRecovery() {
         let history = [performance(weight: 50), performance(weight: 45, offset: 86400), performance(weight: 40, offset: 172800)]
-        XCTAssertTrue(FitnessLogic.progression(history).contains("two consecutive"))
+        XCTAssertTrue(FitnessLogic.progression(history).contains(L10n.text("Recorded per-set performance dropped in two consecutive sessions. Check for planned lighter days; otherwise maintain or reduce load by 5–10% and review recovery.")))
     }
     func testMissedRepsDoNotSuggestIncrease() {
-        XCTAssertTrue(FitnessLogic.progression([performance(weight: 40, reps: 5)]).contains("Maintain"))
+        XCTAssertTrue(FitnessLogic.progression([performance(weight: 40, reps: 5)]).contains(L10n.text("Maintain workload until target reps feel controlled. Reduce load if form or recovery suffers.")))
     }
     func testHeavyLegWarningRequiresNearbyBadminton() {
         XCTAssertNotNil(FitnessLogic.legWarning(gymDate: now, heavyLegs: true, badmintonDates: [now.addingTimeInterval(86400)]))
@@ -106,7 +106,7 @@ final class FitnessLogicTests: XCTestCase {
             badminton: false, inventory: ["chicken", "rice"], trend: FitnessLogic.weightTrend([]))
         XCTAssertEqual(options.count, 3)
         XCTAssertEqual(options.first?.name, "Chicken rice bowl")
-        XCTAssertTrue(options.first!.note.contains("inventory"))
+        XCTAssertTrue(options.first!.note.contains(L10n.text(" Uses food in your inventory.")))
     }
     func testActivityAndProteinNeedsAffectPortions() {
         let low = FitnessLogic.mealOptions(remainingCalories: 300, remainingProtein: 10, trained: false,
@@ -115,11 +115,11 @@ final class FitnessLogicTests: XCTestCase {
             badminton: false, inventory: [], trend: FitnessLogic.weightTrend([])).first { $0.name == "Chicken rice bowl" }!
         XCTAssertGreaterThan(high.calories, low.calories)
         XCTAssertGreaterThan(high.protein, low.protein)
-        XCTAssertTrue(high.note.contains("activity"))
+        XCTAssertTrue(high.note.contains(L10n.text(" Include carbs to support today's activity.")))
     }
     func testMockClearlyDisclosesNoRecognition() async throws {
         let estimate = try await MockFoodPhotoAnalyzer().analyze(imageData: Data([1]))
-        XCTAssertTrue(estimate.explanation.contains("does not identify"))
+        XCTAssertTrue(estimate.explanation.contains(L10n.text("DEMO ONLY: this fixed result does not identify your photo. Edit every item using real portions/product labels before saving.")))
         XCTAssertGreaterThan(estimate.calories, 0)
     }
     func testMockRejectsMissingImage() async {

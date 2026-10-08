@@ -6,7 +6,7 @@ import XCTest
         continueAfterFailure = false
         app = XCUIApplication()
         // Fresh in-memory SwiftData and no automatic Health reads. Never touches personal logs.
-        app.launchArguments = ["--uitesting"]
+        app.launchArguments = ["--uitesting", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
     }
@@ -84,4 +84,43 @@ import XCTest
             XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
         }
     }
+    func testSimplifiedChineseTabsFormsAndSettings() {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["今日"].waitForExistence(timeout: 10))
+        for (tab, title) in [("营养", "营养"), ("训练", "训练"), ("进展", "进展"), ("设置", "设置"), ("首页", "今日")] {
+            app.tabBars.buttons[tab].tap()
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 3))
+        }
+        tap("记录饮食")
+        XCTAssertTrue(app.navigationBars["记录饮食"].waitForExistence(timeout: 3))
+        for label in ["食物 / 餐食名称", "热量（千卡）", "蛋白质（克）"] {
+            let field = app.textFields[label].firstMatch
+            if !field.isHittable { app.swipeUp() }
+            XCTAssertTrue(field.isHittable, label)
+            XCTAssertGreaterThanOrEqual(field.frame.minX, app.frame.minX)
+            XCTAssertLessThanOrEqual(field.frame.maxX, app.frame.maxX)
+        }
+        attachScreenshot("zh-Hans meal form")
+        app.navigationBars.buttons["取消"].tap()
+        app.tabBars.buttons["设置"].tap()
+        tap("资料、目标与早餐")
+        XCTAssertTrue(app.navigationBars["资料与目标"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.textFields["身高（厘米）"].exists)
+        attachScreenshot("zh-Hans profile form")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        tap("服务与 API 凭据")
+        XCTAssertTrue(app.navigationBars["食物照片分析"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["保存"].exists)
+        attachScreenshot("zh-Hans food analysis settings")
+    }
+    private func attachScreenshot(_ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
 }
