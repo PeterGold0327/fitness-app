@@ -15,6 +15,16 @@ private actor RecordingAnalysisTransport: FoodAnalysisHTTPTransport {
     init(data: Data, status: Int = 200) { response = AnalysisHTTPResponse(data: data, status: status) }
     func send(_ request: URLRequest) async throws -> AnalysisHTTPResponse { requests.append(request); return response }
 }
+private actor SequencedMealTransport: FoodAnalysisHTTPTransport {
+    var responses: [AnalysisHTTPResponse]
+    private(set) var requests: [URLRequest] = []
+    init(_ data: [Data]) { responses = data.map { AnalysisHTTPResponse(data: $0, status: 200) } }
+    func send(_ request: URLRequest) async throws -> AnalysisHTTPResponse {
+        requests.append(request)
+        guard !responses.isEmpty else { throw FoodAnalysisError.network }
+        return responses.removeFirst()
+    }
+}
 private struct FailingAnalysisTransport: FoodAnalysisHTTPTransport {
     let code: URLError.Code
     func send(_ request: URLRequest) async throws -> AnalysisHTTPResponse { throw URLError(code) }
@@ -270,4 +280,220 @@ final class FoodPhotoAPITests: XCTestCase {
         XCTAssertEqual(estimate.source, .mockFallback)
         XCTAssertTrue(estimate.explanation.contains(FoodAnalysisError.missingCredential.localizedDescription))
     }
+    private func detectionJSON() -> [String: Any] {
+        ["name": "中式午餐", "confidence": 0.65, "uncertainty_notes": "油量未知，熟重估算", "items": [
+            ["name": "宫保鸡丁", "grams": 180, "confidence": 0.6, "uncertainty_notes": "花生和油量不确定"],
+            ["name": "米饭", "grams": 200, "confidence": 0.9, "uncertainty_notes": "熟重"],
+            ["name": "疑似汤", "grams": 100, "confidence": 0.2, "uncertainty_notes": "可能没有喝汤"]
+        ]]
+    }
+    private func requestBody(_ request: URLRequest) throws -> [String: Any] {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+    }
+    private func requestPrompt(_ request: URLRequest) throws -> String {
+        let input = try XCTUnwrap(try requestBody(request)["input"] as? [[String: Any]])
+        let content = try XCTUnwrap(input[0]["content"] as? [[String: Any]])
+        return try XCTUnwrap(content[0]["text"] as? String)
+    }
+    func testTwoStepChineseMealReviewAddRemoveCorrectAndRecalculate() async throws {
+        var nutrition = detectionJSON()
+        nutrition["items"] = [
+            ["name": "番茄炒蛋", "grams": 180, "calories": 240, "protein": 14, "carbs": 10, "fat": 16,
+             "confidence": 0.7, "uncertainty_notes": "少油"],
+            ["name": "米饭", "grams": 150, "calories": 195, "protein": 4, "carbs": 42, "fat": 0.5,
+             "confidence": 0.9, "uncertainty_notes": "用户称重"],
+            ["name": "青菜", "grams": 100, "calories": 60, "protein": 2, "carbs": 5, "fat": 4,
+             "confidence": 0.5, "uncertainty_notes": "少油"]
+        ]
+        let transport = SequencedMealTransport([try envelope(detectionJSON()), try envelope(nutrition)])
+        let analyzer = ResponsesFoodPhotoAnalyzer(configuration: live, apiKey: "test-key", transport: transport)
+        var reviewed = try await analyzer.detect(imageData: image, context: "家常菜，少油")
+        XCTAssertEqual(reviewed.items.count, 3)
+        XCTAssertEqual(reviewed.calories, 0, "Detection does not produce nutrition")
+        let beforeReview = await transport.requests
+        XCTAssertEqual(beforeReview.count, 1, "Nutrition requires a separate user action")
+        reviewed.items[0].name = "番茄炒蛋"
+        reviewed.items[1].grams = 150
+        reviewed.items.removeLast()
+        reviewed.items.append(EstimatedFoodItem(name: "青菜", grams: 100, calories: 0, protein: 0,
+            carbs: 0, fat: 0, confidence: 0.5, uncertaintyNotes: "用户添加"))
+        let result = try await analyzer.estimateNutrition(imageData: image, reviewed: reviewed, context: "不是宫保鸡丁，是番茄炒蛋；米饭熟重150克；不喝汤")
+        XCTAssertEqual(result.items.map(\.name), ["番茄炒蛋", "米饭", "青菜"])
+        XCTAssertEqual(result.items.map(\.id), reviewed.items.map(\.id))
+        XCTAssertEqual(result.name, reviewed.name)
+        XCTAssertEqual(result.calories, 495)
+        XCTAssertEqual(result.protein, 20)
+        XCTAssertEqual(result.carbs, 57)
+        XCTAssertEqual(result.fat, 20.5)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2)
+        let prompt = try requestPrompt(requests[1])
+        XCTAssertTrue(prompt.contains("米饭熟重150克"))
+        XCTAssertTrue(prompt.contains("番茄炒蛋"))
+        XCTAssertFalse(prompt.contains("疑似汤"), "Removed foods must not be in the reviewed list")
+        XCTAssertFalse(prompt.contains("\"calories\":"), "Provisional nutrition must not anchor the new estimate")
+        for request in requests { XCTAssertEqual(try requestBody(request)["store"] as? Bool, false) }
+    }
+    func testDetectionSchemaExcludesNutritionAndIncludesChineseMixedMealGuidance() async throws {
+        let transport = RecordingAnalysisTransport(data: try envelope(detectionJSON()))
+        let analyzer = ResponsesFoodPhotoAnalyzer(configuration: live, apiKey: "test-key", transport: transport)
+        _ = try await analyzer.detect(imageData: image, context: "麻辣烫不喝汤")
+        let requests = await transport.requests
+        let body = try requestBody(requests[0])
+        let text = try XCTUnwrap(body["text"] as? [String: Any])
+        let format = try XCTUnwrap(text["format"] as? [String: Any])
+        let schema = try XCTUnwrap(format["schema"] as? [String: Any])
+        let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+        let items = try XCTUnwrap(properties["items"] as? [String: Any])
+        let item = try XCTUnwrap(items["items"] as? [String: Any])
+        XCTAssertEqual(Set(try XCTUnwrap(item["required"] as? [String])), Set(["name", "grams", "confidence", "uncertainty_notes"]))
+        let prompt = try requestPrompt(requests[0])
+        for dish in ["盖浇饭", "麻辣烫", "火锅", "炒饭", "饺子", "麻婆豆腐", "红烧肉"] { XCTAssertTrue(prompt.contains(dish)) }
+        XCTAssertTrue(prompt.contains("麻辣烫不喝汤"))
+    }
+    func testReanalysisUsesNewContextWithoutMutatingPriorReview() async throws {
+        var corrected = detectionJSON()
+        corrected["items"] = [["name": "麻婆豆腐", "grams": 220, "confidence": 0.8, "uncertainty_notes": "用户说明"]]
+        let transport = SequencedMealTransport([try envelope(detectionJSON()), try envelope(corrected)])
+        let analyzer = ResponsesFoodPhotoAnalyzer(configuration: live, apiKey: "test-key", transport: transport)
+        let original = try await analyzer.detect(imageData: image, context: "")
+        let revised = try await analyzer.detect(imageData: image, context: "这是麻婆豆腐，不是鸡肉")
+        XCTAssertEqual(original.items[0].name, "宫保鸡丁")
+        XCTAssertEqual(revised.items[0].name, "麻婆豆腐")
+        let requests = await transport.requests
+        XCTAssertTrue(try requestPrompt(requests[1]).contains("这是麻婆豆腐，不是鸡肉"))
+    }
+    func testNutritionRejectsChangedNamesPortionsAddedRemovedOrReorderedFoods() throws {
+        let reviewed = try ResponsesFoodPhotoAnalyzer.parse(envelope())
+        var candidates: [FoodEstimate] = []
+        var changed = reviewed; changed.items[0].name = "Wrong dish"; candidates.append(changed)
+        changed = reviewed; changed.items[0].grams += 10; candidates.append(changed)
+        changed = reviewed; changed.items.reverse(); candidates.append(changed)
+        changed = reviewed; changed.items.removeLast(); candidates.append(changed)
+        changed = reviewed; changed.items.append(reviewed.items[0]); candidates.append(changed)
+        for result in candidates {
+            XCTAssertThrowsError(try FoodReview.merge(result, reviewed: reviewed)) {
+                XCTAssertEqual($0 as? FoodAnalysisError, .invalidResponse)
+            }
+        }
+    }
+    func testCorrectingPortionRescalesNutritionAndRemovingFoodUpdatesTotals() throws {
+        var meal = try ResponsesFoodPhotoAnalyzer.parse(envelope())
+        let originalID = meal.items[0].id
+        meal.items[0].resize(to: 75)
+        XCTAssertEqual(meal.items[0].id, originalID)
+        XCTAssertEqual(meal.items[0].calories, 124)
+        XCTAssertEqual(meal.items[0].protein, 23.25)
+        XCTAssertEqual(meal.items[0].fat, 2.7)
+        XCTAssertEqual(meal.calories, 384)
+        // Preserve a manual nutrition correction as the new per-gram baseline.
+        meal.items[0].calories = 150
+        meal.items[0].resize(to: 150)
+        XCTAssertEqual(meal.items[0].calories, 300)
+        meal.items.removeLast()
+        XCTAssertEqual(meal.calories, 300)
+        XCTAssertEqual(meal.protein, 46.5)
+        XCTAssertTrue(meal.valid)
+    }
+    func testConfidenceLabelsHaveExplicitBoundaries() throws {
+        var item = try ResponsesFoodPhotoAnalyzer.parse(envelope()).items[0]
+        for (confidence, label) in [(0.0, "Low confidence"), (0.49, "Low confidence"),
+                                    (0.5, "Medium confidence"), (0.79, "Medium confidence"),
+                                    (0.8, "High confidence"), (1.0, "High confidence")] {
+            item.confidence = confidence
+            XCTAssertEqual(item.confidenceLevel, L10n.text(label))
+        }
+    }
+    func testInvalidDetectionAndEmptyFoodsAreRejected() throws {
+        for value in [-0.1, 1.1] {
+            var json = detectionJSON(); json["confidence"] = value
+            XCTAssertThrowsError(try ResponsesFoodPhotoAnalyzer.parse(envelope(json), detection: true))
+        }
+        var empty = detectionJSON(); empty["items"] = []
+        XCTAssertThrowsError(try ResponsesFoodPhotoAnalyzer.parse(envelope(empty), detection: true)) {
+            XCTAssertEqual($0 as? FoodAnalysisError, .noFoodDetected)
+        }
+        var invalid = detectionJSON()
+        invalid["items"] = [["name": "米饭", "grams": -1, "confidence": 0.9, "uncertainty_notes": ""]]
+        XCTAssertThrowsError(try ResponsesFoodPhotoAnalyzer.parse(envelope(invalid), detection: true))
+    }
+    func testOversizedContextAndInvalidReviewDoNotUploadOrFallback() async throws {
+        let transport = RecordingAnalysisTransport(data: try envelope())
+        let primary = ResponsesFoodPhotoAnalyzer(configuration: live, apiKey: "test-key", transport: transport)
+        let fallback = CountingDemoAnalyzer()
+        let analyzer = FallbackFoodPhotoAnalyzer(primary: primary, fallback: fallback, enabled: true)
+        let reviewed = try ResponsesFoodPhotoAnalyzer.parse(envelope())
+        do {
+            _ = try await analyzer.detect(imageData: image, context: String(repeating: "饭", count: 2001))
+            XCTFail("Oversized context should fail")
+        } catch { XCTAssertEqual(error as? FoodAnalysisError, .invalidContext) }
+        var empty = reviewed; empty.items = []
+        do {
+            _ = try await analyzer.estimateNutrition(imageData: image, reviewed: empty, context: "")
+            XCTFail("Empty review should fail")
+        } catch { XCTAssertEqual(error as? FoodAnalysisError, .invalidResponse) }
+        let requests = await transport.requests; XCTAssertTrue(requests.isEmpty)
+        let calls = await fallback.calls; XCTAssertEqual(calls, 0)
+    }
+    func testFailedNutritionLeavesReviewUsableAndCancellationDoesNotFallback() async throws {
+        let reviewed = try ResponsesFoodPhotoAnalyzer.parse(envelope())
+        let transport = RecordingAnalysisTransport(data: Data(), status: 429)
+        let primary = ResponsesFoodPhotoAnalyzer(configuration: live, apiKey: "test-key", transport: transport)
+        do {
+            _ = try await primary.estimateNutrition(imageData: image, reviewed: reviewed, context: "少油")
+            XCTFail("Rate limiting must be reported")
+        } catch { XCTAssertEqual(error as? FoodAnalysisError, .rateLimited) }
+        XCTAssertEqual(reviewed.calories, 508)
+        let cancelled = ResponsesFoodPhotoAnalyzer(configuration: live, apiKey: "test-key", transport: FailingAnalysisTransport(code: .cancelled))
+        let fallback = CountingDemoAnalyzer()
+        let analyzer = FallbackFoodPhotoAnalyzer(primary: cancelled, fallback: fallback, enabled: true)
+        do {
+            _ = try await analyzer.estimateNutrition(imageData: image, reviewed: reviewed, context: "")
+            XCTFail("Cancellation must propagate")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        let calls = await fallback.calls; XCTAssertEqual(calls, 0)
+    }
+    func testDemoNutritionPreservesCorrectedFoodsWithoutInventingNameBasedMacros() async throws {
+        var reviewed = try ResponsesFoodPhotoAnalyzer.parse(envelope())
+        reviewed.items.removeFirst()
+        reviewed.items[0].name = "手动更正的炒饭"
+        reviewed.items[0].calories = 400
+        let result = try await MockFoodPhotoAnalyzer().estimateNutrition(imageData: image, reviewed: reviewed, context: "少油")
+        XCTAssertEqual(result.items.map(\.name), ["手动更正的炒饭"])
+        XCTAssertEqual(result.calories, 400)
+        XCTAssertEqual(result.items[0].id, reviewed.items[0].id)
+        XCTAssertEqual(result.source, .mock)
+        XCTAssertEqual(result.confidence, 0)
+        XCTAssertEqual(result.items[0].confidence, 0)
+    }
+    func testContextualFactoryDispatchesDetectionAndNutritionThroughFallbackWrapper() async throws {
+        let credentials = TestFoodCredentials(); credentials.keys[live.credentialAccount!] = "test-key"
+        let detection = try envelope(detectionJSON())
+        var nutrition = detectionJSON()
+        var items = nutrition["items"] as! [[String: Any]]
+        for index in items.indices {
+            items[index]["calories"] = 100
+            items[index]["protein"] = 5
+            items[index]["carbs"] = 10
+            items[index]["fat"] = 4
+        }
+        nutrition["items"] = items
+        let transport = SequencedMealTransport([detection, try envelope(nutrition)])
+        let analyzer = try FoodAnalysisServiceFactory.make(configuration: live, credentials: credentials, transport: transport)
+        let result = try await analyzer.detect(imageData: image, context: "少油")
+        XCTAssertEqual(result.calories, 0)
+        XCTAssertEqual(result.items[0].name, "宫保鸡丁")
+        let estimated = try await analyzer.estimateNutrition(imageData: image, reviewed: result, context: "少油")
+        XCTAssertEqual(estimated.calories, 300)
+        XCTAssertEqual(estimated.items.map(\.id), result.items.map(\.id))
+        let fallbackTransport = RecordingAnalysisTransport(data: Data(), status: 503)
+        let failing = ResponsesFoodPhotoAnalyzer(configuration: live, apiKey: "test-key", transport: fallbackTransport)
+        let withFallback = FallbackFoodPhotoAnalyzer(primary: failing, fallback: MockFoodPhotoAnalyzer(), enabled: true)
+        let fallbackResult = try await withFallback.estimateNutrition(imageData: image, reviewed: estimated, context: "少油")
+        XCTAssertEqual(fallbackResult.source, .mockFallback)
+        XCTAssertEqual(fallbackResult.items.map(\.name), estimated.items.map(\.name))
+        XCTAssertEqual(fallbackResult.calories, 300)
+        XCTAssertEqual(fallbackResult.confidence, 0)
+    }
+
 }

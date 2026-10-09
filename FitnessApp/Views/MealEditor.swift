@@ -53,6 +53,9 @@ struct MealEditor: View {
     @State private var cameraDenied = false
     @State private var saving = false
     private var busy: Bool { analyzing || loadingPhoto || requestingCamera }
+    @State private var mealContext = ""
+    @State private var awaitingNutrition = false
+    @State private var hasFoodReview = false
     @State private var estimatedItems: [EstimatedFoodItem] = []
     @State private var analysisSource: FoodAnalysisSource = .manual
     @State private var analysisConfidence = 0.0
@@ -75,7 +78,7 @@ struct MealEditor: View {
             Form {
                 photoSection
                 mealEstimateSection.disabled(busy)
-                if itemised {
+                if itemised || hasFoodReview {
                     detectedFoodsSection
                 }
                 if analysisSource != .manual || !analysisNotes.isEmpty {
@@ -88,7 +91,7 @@ struct MealEditor: View {
             }.navigationTitle(existing == nil ? L10n.text("Log food") : L10n.text("Edit meal")).keyboardDoneButton()
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button(L10n.text("Cancel")) { analysisTask?.cancel(); photoLoadTask?.cancel(); dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) { Button(L10n.text("Save")) { save() }.disabled(!valid || busy || saving) }
+                    ToolbarItem(placement: .confirmationAction) { Button(L10n.text("Save")) { save() }.disabled(!valid || busy || saving || awaitingNutrition) }
                 }
                 .interactiveDismissDisabled(loadingPhoto || requestingCamera)
                 .task {
@@ -101,6 +104,7 @@ struct MealEditor: View {
                         analysisNotes = existing.analysisNotes
                         // Legacy/recipe children without full analysis metadata remain aggregate edits.
                         if existing.foods.allSatisfy({ $0.confidence != nil }) {
+                            hasFoodReview = !existing.foods.isEmpty
                             estimatedItems = existing.foods.sorted { $0.position < $1.position }.map {
                                 EstimatedFoodItem(name: $0.name, grams: $0.grams, calories: $0.calories, protein: $0.protein,
                                     carbs: $0.carbs, fat: $0.fat, confidence: $0.confidence ?? 0, uncertaintyNotes: $0.uncertaintyNotes)
@@ -149,7 +153,9 @@ struct MealEditor: View {
         Section(L10n.text("Detected foods — editable")) {
             ForEach($estimatedItems) { $item in
                 DisclosureGroup {
-                    FoodEstimateItemEditor(item: $item)
+                    FoodEstimateItemEditor(item: $item, nameChanged: {
+                        if photoData != nil { awaitingNutrition = true }
+                    })
                     Button(L10n.text("Remove this food"), role: .destructive) {
                         let id = item.id
                         estimatedItems.removeAll { $0.id == id }
@@ -157,16 +163,27 @@ struct MealEditor: View {
                     }
                 } label: {
                     VStack(alignment: .leading) {
+                        Text(item.confidenceLevel).font(.caption).foregroundStyle(.secondary)
                         Text(item.name.isEmpty ? L10n.text("New food — enter details") : item.name)
-                        Text(L10n.text("%@ g · %@ kcal · %@ g protein", String(describing: item.grams.wholeText), String(describing: item.calories.wholeText), String(describing: item.protein.wholeText))).font(.caption).foregroundStyle(.secondary)
+                        if awaitingNutrition {
+                            Text(L10n.text("%@ g · nutrition awaiting review", String(describing: item.grams.wholeText))).font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            Text(L10n.text("%@ g · %@ kcal · %@ g protein", String(describing: item.grams.wholeText), String(describing: item.calories.wholeText), String(describing: item.protein.wholeText))).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
             Button(L10n.text("Add a missing food")) {
+                if photoData != nil { awaitingNutrition = true }
                 estimatedItems.append(EstimatedFoodItem(name: "", grams: 0, calories: 0, protein: 0,
                     carbs: 0, fat: 0, confidence: 0, uncertaintyNotes: L10n.text("Added manually; verify portion and product labels.")))
             }.disabled(estimatedItems.count >= 30)
-            Text(L10n.text("Values are for the whole listed portion. Changing grams does not automatically rescale macros; edit the nutrition values too.")).font(.caption)
+            if awaitingNutrition {
+                Button(L10n.text("Use my manually corrected nutrition")) {
+                    awaitingNutrition = false; analysisSource = .manual
+                }.disabled(!valid || estimatedItems.isEmpty)
+            }
+            Text(L10n.text("Changing grams rescales the current nutrition estimate. Correct names or ingredients, then estimate nutrition again; check oils and sauces.")).font(.caption)
         }.disabled(busy)
     }
 
@@ -175,7 +192,9 @@ struct MealEditor: View {
             TextField(L10n.text("Food / meal name"), text: $name)
             DatePicker(L10n.text("Eaten at"), selection: $date, in: ...Date())
                 .disabled(existing?.isBreakfast == true)
-            if itemised {
+            if awaitingNutrition {
+                Text(L10n.text("Step 1: review detected dishes and portions, then estimate nutrition. Nothing is saved yet.")).font(.callout)
+            } else if itemised {
                 MetricRow(title: L10n.text("Calories"), value: L10n.text("%@ kcal", String(describing: totalCalories.wholeText)))
                 MetricRow(title: L10n.text("Protein"), value: L10n.text("%@ g", String(describing: totalProtein.wholeText)))
                 MetricRow(title: L10n.text("Carbs"), value: L10n.text("%@ g", String(describing: totalCarbs.wholeText)))
@@ -208,10 +227,25 @@ struct MealEditor: View {
                 }
             }
             if photoData != nil {
-                Button(analyzing ? L10n.text("Analyzing…") : analysisSettings.configuration.mode == .mock ? L10n.text("Analyze with demo provider") : L10n.text("Analyze food photo")) {
+                TextField(L10n.text("Meal context: dishes, ingredients, oil, portions…"), text: $mealContext, axis: .vertical)
+                    .disabled(busy)
+                Text(L10n.text("For example: 宫保鸡丁 + 米饭；少油，米饭熟重 150 g；麻辣烫不喝汤。Context is sent with the photo only when you request analysis.")).font(.caption)
+                if mealContext.count > 2000 {
+                    Text(L10n.text("Keep meal context within 2,000 characters.")).foregroundStyle(.red)
+                }
+                if hasFoodReview || itemised {
+                    Button(L10n.text("Step 2: estimate nutrition for reviewed foods")) {
+                        analysisTask = Task { await analyze(nutrition: true) }
+                    }.disabled(busy || !valid || estimatedItems.isEmpty || mealContext.count > 2000)
+                    Text(L10n.text("Re-analyzing the photo replaces the current food list after success. Estimating nutrition keeps your reviewed names and portions.")).font(.caption)
+                }
+                Button(analyzing ? L10n.text("Analyzing…") : analysisSettings.configuration.mode == .mock ? L10n.text("Analyze with demo provider") : L10n.text("Step 1: detect / re-analyze foods")) {
                     analysisTask = Task { await analyze() }
                 }
-                    .disabled(busy)
+                    .disabled(busy || mealContext.count > 2000)
+                if analyzing {
+                    Button(L10n.text("Cancel analysis")) { analysisTask?.cancel() }
+                }
                 Button(L10n.text("Remove photo"), role: .destructive) { flagPhotoChange(); photoData = nil; photoItem = nil }.disabled(busy)
             }
             if analysisSettings.configuration.mode == .mock {
@@ -234,17 +268,25 @@ struct MealEditor: View {
         cameraDenied = !allowed
         if allowed { showCamera = true }
     }
-    @MainActor private func analyze() async {
+    @MainActor private func analyze(nutrition: Bool = false) async {
         guard !busy, let data = photoData else { return }
         analyzing = true; error = nil
         defer { analyzing = false }
         do {
             let analyzer = try analysisSettings.analyzer()
-            let estimate = try await analyzer.analyze(imageData: data)
+            let reviewed = FoodEstimate(name: name, items: estimatedItems, confidence: analysisConfidence,
+                                        uncertaintyNotes: analysisNotes, source: analysisSource)
+            let estimate: FoodEstimate
+            if nutrition {
+                estimate = try await analyzer.estimateNutrition(imageData: data, reviewed: reviewed, context: mealContext)
+            } else {
+                estimate = try await analyzer.detect(imageData: data, context: mealContext)
+            }
             try Task.checkCancellation()
             name = estimate.name; calories = estimate.calories; protein = estimate.protein
             carbs = estimate.carbs; fat = estimate.fat; estimatedItems = estimate.items
             analysisSource = estimate.source; analysisConfidence = estimate.confidence; analysisNotes = estimate.uncertaintyNotes
+            hasFoodReview = true; awaitingNutrition = !nutrition
         } catch is CancellationError { return }
         catch { self.error = L10n.text("Analysis failed: %@. You can still enter the meal manually.", String(describing: error.localizedDescription)) }
     }
@@ -253,7 +295,7 @@ struct MealEditor: View {
         analysisNotes = L10n.text("Photo changed/removed. Previous estimates are retained; verify them or analyze the new photo.\n") + String(analysisNotes.prefix(3700))
     }
     private func save() {
-        guard valid, !busy, !saving else { return }; saving = true
+        guard valid, !busy, !saving, !awaitingNutrition else { return }; saving = true
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let success: Bool
         if let existing {
@@ -324,9 +366,28 @@ private enum MealPhoto {
 
 private struct FoodEstimateItemEditor: View {
     @Binding var item: EstimatedFoodItem
+    var nameChanged: () -> Void
+    @State private var lastValidGrams = 0.0
+    private var portion: Binding<Double> {
+        Binding(get: { item.grams }, set: { grams in
+            // NumberField can emit invalid intermediate text while the user types.
+            // Keep the last usable density so clearing/retyping a portion does not lose it.
+            if !item.grams.isFinite || item.grams <= 0 || item.grams > 10000 {
+                item.grams = lastValidGrams
+            }
+            item.resize(to: grams)
+            if grams.isFinite, grams > 0, grams <= 10000 { lastValidGrams = grams }
+        })
+    }
     var body: some View {
         TextField(L10n.text("Detected food name"), text: $item.name)
-        NumberField(title: L10n.text("Estimated grams"), value: $item.grams)
+            .onChange(of: item.name) { _, _ in nameChanged() }
+        NumberField(title: L10n.text("Estimated grams"), value: portion)
+            .onAppear { lastValidGrams = item.grams }
+            .onChange(of: item.grams) { _, grams in
+                if grams.isFinite, grams > 0, grams <= 10000 { lastValidGrams = grams }
+            }
+        Text(item.confidenceLevel).font(.caption)
         NumberField(title: L10n.text("Item calories (kcal)"), value: $item.calories)
         NumberField(title: L10n.text("Item protein (g)"), value: $item.protein)
         NumberField(title: L10n.text("Item carbs (g)"), value: $item.carbs)

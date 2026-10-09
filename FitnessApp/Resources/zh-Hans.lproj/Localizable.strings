@@ -372,3 +372,20 @@
 "≈ %@ kcal · %@ g protein" = "约 %@ 千卡 · 蛋白质 %@ 克";
 "≈ %@ kcal · %@ g protein · %@ g carbs · %@ g fat" = "约 %@ 千卡 · 蛋白质 %@ 克 · 碳水 %@ 克 · 脂肪 %@ 克";
 "Me" = "我";
+
+/* Two-step meal recognition and review */
+"High confidence" = "高置信度";
+"Medium confidence" = "中等置信度";
+"Low confidence" = "低置信度";
+"Keep meal context within 2,000 characters." = "餐食补充说明请控制在 2,000 个字符以内。";
+"Demo keeps your edited nutrition values; it does not calculate nutrition from food names or context." = "演示模式保留你修改后的营养数值，不会根据食物名称或补充说明计算营养。";
+"Changing grams rescales the current nutrition estimate. Correct names or ingredients, then estimate nutrition again; check oils and sauces." = "修改克数会按比例调整当前营养估算。更正名称或食材后，请重新估算营养，并检查油和酱料。";
+"Step 1: review detected dishes and portions, then estimate nutrition. Nothing is saved yet." = "第 1 步：核对识别出的菜品和份量，然后估算营养。此时尚未保存。";
+"Meal context: dishes, ingredients, oil, portions…" = "餐食补充说明：菜品、食材、油量、份量…";
+"For example: 宫保鸡丁 + 米饭；少油，米饭熟重 150 g；麻辣烫不喝汤。Context is sent with the photo only when you request analysis." = "例如：宫保鸡丁 + 米饭；少油，米饭熟重 150 g；麻辣烫不喝汤。仅在你发起分析时，补充说明才会随照片发送。";
+"Step 2: estimate nutrition for reviewed foods" = "第 2 步：估算已核对食物的营养";
+"Re-analyzing the photo replaces the current food list after success. Estimating nutrition keeps your reviewed names and portions." = "重新识别照片成功后会替换当前食物列表。估算营养会保留你核对后的名称和份量。";
+"Step 1: detect / re-analyze foods" = "第 1 步：识别 / 重新识别食物";
+"Cancel analysis" = "取消分析";
+"Use my manually corrected nutrition" = "使用我手动更正的营养数值";
+"%@ g · nutrition awaiting review" = "%@ 克 · 营养待核对";

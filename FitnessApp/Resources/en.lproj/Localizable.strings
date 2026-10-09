@@ -372,3 +372,20 @@
 "≈ %@ kcal · %@ g protein" = "≈ %@ kcal · %@ g protein";
 "≈ %@ kcal · %@ g protein · %@ g carbs · %@ g fat" = "≈ %@ kcal · %@ g protein · %@ g carbs · %@ g fat";
 "Me" = "Me";
+
+/* Two-step meal recognition and review */
+"High confidence" = "High confidence";
+"Medium confidence" = "Medium confidence";
+"Low confidence" = "Low confidence";
+"Keep meal context within 2,000 characters." = "Keep meal context within 2,000 characters.";
+"Demo keeps your edited nutrition values; it does not calculate nutrition from food names or context." = "Demo keeps your edited nutrition values; it does not calculate nutrition from food names or context.";
+"Changing grams rescales the current nutrition estimate. Correct names or ingredients, then estimate nutrition again; check oils and sauces." = "Changing grams rescales the current nutrition estimate. Correct names or ingredients, then estimate nutrition again; check oils and sauces.";
+"Step 1: review detected dishes and portions, then estimate nutrition. Nothing is saved yet." = "Step 1: review detected dishes and portions, then estimate nutrition. Nothing is saved yet.";
+"Meal context: dishes, ingredients, oil, portions…" = "Meal context: dishes, ingredients, oil, portions…";
+"For example: 宫保鸡丁 + 米饭；少油，米饭熟重 150 g；麻辣烫不喝汤。Context is sent with the photo only when you request analysis." = "For example: 宫保鸡丁 + 米饭；少油，米饭熟重 150 g；麻辣烫不喝汤。Context is sent with the photo only when you request analysis.";
+"Step 2: estimate nutrition for reviewed foods" = "Step 2: estimate nutrition for reviewed foods";
+"Re-analyzing the photo replaces the current food list after success. Estimating nutrition keeps your reviewed names and portions." = "Re-analyzing the photo replaces the current food list after success. Estimating nutrition keeps your reviewed names and portions.";
+"Step 1: detect / re-analyze foods" = "Step 1: detect / re-analyze foods";
+"Cancel analysis" = "Cancel analysis";
+"Use my manually corrected nutrition" = "Use my manually corrected nutrition";
+"%@ g · nutrition awaiting review" = "%@ g · nutrition awaiting review";
