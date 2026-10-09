@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import UIKit
+import OSLog
 
 // Small shared sheet router; each feature owns its own form and validation.
 enum AppSheet: Identifiable {
@@ -22,6 +23,7 @@ struct RootView: View {
     @EnvironmentObject private var health: HealthService
     @Environment(\.scenePhase) private var scenePhase
     @State private var sheet: AppSheet?
+    private let navigationLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "LeanLog", category: "Navigation")
     var body: some View {
         Group {
             if store.isReady { tabs }
@@ -65,12 +67,62 @@ struct RootView: View {
                 .tabItem { Label(L10n.text("Nutrition"), systemImage: "fork.knife") }
             NavigationStack { TrainingView(sheet: $sheet) }
                 .tabItem { Label(L10n.text("Training"), systemImage: "dumbbell") }
-            NavigationStack { ProgressViewScreen(sheet: $sheet) }
+            progressTab
                 .tabItem { Label(L10n.text("Progress"), systemImage: "chart.xyaxis.line") }
             NavigationStack { SettingsView() }
                 .tabItem { Label(L10n.text("Settings"), systemImage: "gearshape") }
         }
         .tint(.teal)
+    }
+
+    // The actual TabView branch owns the archive entry points. They are not part
+    // of a child List's lazy cells or dependent on which analytics sections render.
+    private var progressTab: some View {
+        NavigationStack {
+            ProgressViewScreen(sheet: $sheet)
+                .safeAreaInset(edge: .top, spacing: 0) { progressArchiveNavigation }
+                .onAppear {
+                    navigationLogger.notice("Rendered Progress route: FitnessApp -> RootView.tabs -> RootView.progressTab -> ProgressViewScreen; archive navigation attached by RootView (progress-root-archive-v3).")
+                }
+        }
+    }
+
+    private var progressArchiveNavigation: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(L10n.text("Growth Timeline")).font(.headline).padding(.bottom, 4)
+            NavigationLink { GrowthTimelineView() } label: {
+                progressArchiveLabel(L10n.text("Growth Timeline"), symbol: "calendar")
+            }.accessibilityIdentifier("progress.timeline")
+            NavigationLink { MilestonesView() } label: {
+                progressArchiveLabel(L10n.text("Milestones"), symbol: "flag")
+            }.accessibilityIdentifier("progress.milestones")
+            NavigationLink { ProgressPhotosView() } label: {
+                progressArchiveLabel(L10n.text("Progress Photos"), symbol: "photo.on.rectangle")
+            }.accessibilityIdentifier("progress.photos")
+            NavigationLink { OnThisDayView() } label: {
+                progressArchiveLabel(L10n.text("On This Day"), symbol: "clock.arrow.circlepath")
+            }.accessibilityIdentifier("progress.onThisDay")
+            NavigationLink { TimelineExportView(selectedDate: store.currentDate, period: .day) } label: {
+                progressArchiveLabel(L10n.text("Export Archive"), symbol: "square.and.arrow.down")
+            }.accessibilityIdentifier("progress.export")
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20).padding(.vertical, 8)
+        .background(.regularMaterial)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("progress.archive.navigation")
+    }
+
+    private func progressArchiveLabel(_ title: String, symbol: String) -> some View {
+        HStack {
+            Label(title, systemImage: symbol)
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 

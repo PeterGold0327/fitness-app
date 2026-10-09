@@ -175,6 +175,26 @@ import XCTest
         XCTAssertTrue(app.switches["全部历史"].exists)
         app.navigationBars.buttons["关闭"].tap()
     }
+    func testActualTabRootKeepsArchiveNavigationVisibleWhileAnalyticsScroll() {
+        launchFreshApp()
+        app.tabBars.buttons["Progress"].tap()
+        let archive = app.descendants(matching: .any)["progress.archive.navigation"].firstMatch
+        let analytics = app.descendants(matching: .any)["progress.analytics"].firstMatch
+        XCTAssertTrue(archive.waitForExistence(timeout: 3))
+        XCTAssertTrue(analytics.waitForExistence(timeout: 3))
+        for _ in 0..<5 { analytics.swipeUp() }
+        for identifier in ["progress.timeline", "progress.milestones", "progress.photos", "progress.onThisDay", "progress.export"] {
+            XCTAssertTrue(app.buttons[identifier].isHittable, identifier)
+        }
+        app.buttons["progress.timeline"].tap()
+        XCTAssertTrue(app.navigationBars["Growth Timeline"].waitForExistence(timeout: 3))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(archive.waitForExistence(timeout: 3))
+        app.tabBars.buttons["Home"].tap()
+        app.tabBars.buttons["Progress"].tap()
+        XCTAssertTrue(app.buttons["progress.timeline"].isHittable)
+    }
+
     func testOriginalProgressSectionsRemainBelowArchiveLinks() {
         launchFreshApp()
         app.tabBars.buttons["Progress"].tap()
@@ -184,7 +204,7 @@ import XCTest
             let header = app.staticTexts[title].firstMatch
             for _ in 0..<10 {
                 if header.exists && header.isHittable { break }
-                app.swipeUp()
+                app.descendants(matching: .any)["progress.analytics"].firstMatch.swipeUp()
             }
             XCTAssertTrue(header.isHittable, title)
         }

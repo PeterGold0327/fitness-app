@@ -13,7 +13,6 @@ struct ProgressViewScreen: View {
     }
     var body: some View {
         List {
-            growthTimelineSection
             weightSection
             nutritionSection
             gymProgressSection
@@ -27,27 +26,7 @@ struct ProgressViewScreen: View {
             }
             weightHistorySection
         }.navigationTitle(L10n.text("Progress"))
-    }
-
-    // This is the first section in the real Progress-tab List, above every chart.
-    private var growthTimelineSection: some View {
-        Section(L10n.text("Growth Timeline")) {
-            NavigationLink { GrowthTimelineView() } label: {
-                Label(L10n.text("Growth Timeline"), systemImage: "calendar")
-            }.accessibilityIdentifier("progress.timeline")
-            NavigationLink { MilestonesView() } label: {
-                Label(L10n.text("Milestones"), systemImage: "flag")
-            }.accessibilityIdentifier("progress.milestones")
-            NavigationLink { ProgressPhotosView() } label: {
-                Label(L10n.text("Progress Photos"), systemImage: "photo.on.rectangle")
-            }.accessibilityIdentifier("progress.photos")
-            NavigationLink { OnThisDayView() } label: {
-                Label(L10n.text("On This Day"), systemImage: "clock.arrow.circlepath")
-            }.accessibilityIdentifier("progress.onThisDay")
-            NavigationLink { TimelineExportView(selectedDate: store.currentDate, period: .day) } label: {
-                Label(L10n.text("Export Archive"), systemImage: "square.and.arrow.down")
-            }.accessibilityIdentifier("progress.export")
-        }
+            .accessibilityIdentifier("progress.analytics")
     }
 
     private var weightHistorySection: some View {
