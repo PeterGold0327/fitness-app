@@ -16,6 +16,8 @@ import Combine
     @Published var badminton: [BadmintonEntry] = []
     @Published var inventory: [FoodInventoryItem] = []
     @Published var summaries: [WeeklySummary] = []
+    @Published var milestones: [GrowthMilestone] = []
+    @Published var progressPhotos: [ProgressPhoto] = []
     @Published var day: DailyNutrition
     @Published var errorMessage: String?
     let foodAnalysisSettings: FoodAnalysisSettings
@@ -43,6 +45,9 @@ import Combine
             badminton = try context.fetch(FetchDescriptor<BadmintonEntry>(sortBy: [SortDescriptor(\.day, order: .reverse)]))
             inventory = try context.fetch(FetchDescriptor<FoodInventoryItem>(sortBy: [SortDescriptor(\.name)]))
             summaries = try context.fetch(FetchDescriptor<WeeklySummary>(sortBy: [SortDescriptor(\.weekStart, order: .reverse)]))
+            milestones = try context.fetch(FetchDescriptor<GrowthMilestone>(sortBy: [SortDescriptor(\.date, order: .reverse)]))
+            progressPhotos = try context.fetch(FetchDescriptor<ProgressPhoto>(sortBy: [SortDescriptor(\.date, order: .reverse)]))
+            reconcileTimelineMilestones()
             let today = Calendar.current.startOfDay(for: currentDate)
             let days = try context.fetch(FetchDescriptor<DailyNutrition>())
             if let existing = days.first(where: { Calendar.current.isDate($0.day, inSameDayAs: today) }) { day = existing }
@@ -110,6 +115,9 @@ import Combine
               EntryValidation.meal(name: meal.name, calories: meal.calories, protein: meal.protein, carbs: meal.carbs, fat: meal.fat) else {
             return reject(L10n.text("Enter a meal name, valid nonnegative nutrition values and a date that is not in the future."))
         }
+        guard meal.mealCategory.isEmpty || TimelineMealCategory(rawValue: meal.mealCategory) != nil else {
+            return reject(L10n.text("Choose a valid meal category."))
+        }
         guard meal.analysisNotes.count <= 4000,
               meal.analysisConfidence.map({ $0.isFinite && (0...1).contains($0) }) ?? true,
               FoodAnalysisSource(rawValue: meal.analysisSource) != nil else { return reject(L10n.text("Check analysis confidence and notes.")) }
@@ -130,7 +138,7 @@ import Combine
 
     @discardableResult func updateMeal(_ meal: Meal, name: String, date: Date, calories: Double,
                                        protein: Double, carbs: Double, fat: Double, photoData: Data?, estimatedItems: [EstimatedFoodItem] = [],
-                                       source: FoodAnalysisSource = .manual, confidence: Double? = nil, notes: String = "") -> Bool {
+                                       source: FoodAnalysisSource = .manual, confidence: Double? = nil, notes: String = "", category: String? = nil) -> Bool {
         guard isReady, date <= currentDate,
               EntryValidation.meal(name: name, calories: calories, protein: protein, carbs: carbs, fat: fat),
               !meal.isBreakfast || Calendar.current.isDate(date, inSameDayAs: meal.date) else {
@@ -144,9 +152,15 @@ import Combine
             }
         }
         guard notes.count <= 4000, confidence.map({ $0.isFinite && (0...1).contains($0) }) ?? true else { return reject(L10n.text("Check analysis confidence and notes.")) }
+        guard category.map({ $0.isEmpty || TimelineMealCategory(rawValue: $0) != nil }) ?? true else {
+            return reject(L10n.text("Choose a valid meal category."))
+        }
         let oldFoods = meal.foods
         meal.foods = []
         for food in oldFoods { context.delete(food) }
+        if let category {
+            meal.mealCategory = category
+        }
         meal.name = name; meal.date = date; meal.calories = calories; meal.protein = protein
         meal.carbs = carbs; meal.fat = fat; meal.photoData = photoData
         meal.analysisSource = source.rawValue; meal.analysisConfidence = confidence; meal.analysisNotes = notes

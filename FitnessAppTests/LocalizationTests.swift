@@ -83,4 +83,23 @@ final class LocalizationTests: XCTestCase {
             XCTAssertFalse(translated.isEmpty)
         }
     }
+    func testGrowthTimelineTerminologyInEnglishAndSimplifiedChinese() throws {
+        let chinese = try localizedBundle("zh-Hans"), english = try localizedBundle("en")
+        for (key, translation) in [("Growth Timeline", "成长时间线"), ("Milestones", "里程碑"),
+                                    ("Progress Photos", "成长照片"), ("On This Day", "那年今日"),
+                                    ("Export Archive", "导出成长档案")] {
+            XCTAssertEqual(chinese.localizedString(forKey: key, value: key, table: "Localizable"), translation)
+            XCTAssertEqual(english.localizedString(forKey: key, value: key, table: "Localizable"), key)
+        }
+    }
+    func testChineseTimelineSummaryFormatsAllValues() throws {
+        let chinese = try localizedBundle("zh-Hans")
+        let key = "Nutrition recorded on %@/%@ days; averages on logged days: %@ kcal · %@ g protein. Gym: %@ sessions; badminton: %@ days. Sleep: %@ h across %@ nights. Both nutrition targets met on %@ logged days."
+        let format = chinese.localizedString(forKey: key, value: key, table: "Localizable")
+        let result = String(format: format, arguments: ["5", "7", "2700", "130", "3", "2", "7.5", "6", "4"])
+        XCTAssertTrue(result.contains("5/7 天")); XCTAssertTrue(result.contains("2700 千卡"))
+        XCTAssertTrue(result.contains("力量训练：3 次")); XCTAssertTrue(result.contains("平均 7.5 小时，共 6 晚"))
+        XCTAssertTrue(result.contains("4 个已记录日")); XCTAssertFalse(result.contains("%@"))
+    }
+
 }

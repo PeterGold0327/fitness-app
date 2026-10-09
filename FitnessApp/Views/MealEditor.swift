@@ -39,6 +39,7 @@ struct MealEditor: View {
     var startWithCamera = false
     @State private var name = ""
     @State private var date = Date()
+    @State private var mealCategory = ""
     @State private var calories = 0.0
     @State private var protein = 0.0
     @State private var carbs = 0.0
@@ -97,6 +98,7 @@ struct MealEditor: View {
                 .task {
                     guard !loaded else { return }; loaded = true
                     if let existing {
+                        mealCategory = existing.mealCategory
                         name = existing.name; date = existing.date; calories = existing.calories
                         protein = existing.protein; carbs = existing.carbs; fat = existing.fat; photoData = existing.photoData
                         analysisSource = FoodAnalysisSource(rawValue: existing.analysisSource) ?? .manual
@@ -190,6 +192,12 @@ struct MealEditor: View {
     private var mealEstimateSection: some View {
         Section(L10n.text("Meal estimate — editable")) {
             TextField(L10n.text("Food / meal name"), text: $name)
+            Picker(L10n.text("Meal category"), selection: $mealCategory) {
+                Text(L10n.text("Automatic (by time)")).tag("")
+                ForEach(TimelineMealCategory.allCases, id: \.rawValue) { category in
+                    Text(category.label).tag(category.rawValue)
+                }
+            }.disabled(existing?.isBreakfast == true)
             DatePicker(L10n.text("Eaten at"), selection: $date, in: ...Date())
                 .disabled(existing?.isBreakfast == true)
             if awaitingNutrition {
@@ -302,10 +310,11 @@ struct MealEditor: View {
             success = store.updateMeal(existing, name: cleanName, date: date, calories: totalCalories,
                 protein: totalProtein, carbs: totalCarbs, fat: totalFat, photoData: photoData,
                 estimatedItems: estimatedItems, source: analysisSource, confidence: analysisSource == .manual ? nil : analysisConfidence,
-                notes: analysisNotes)
+                notes: analysisNotes, category: mealCategory)
         } else {
             let meal = Meal(date: date, name: cleanName, calories: totalCalories, protein: totalProtein,
                             carbs: totalCarbs, fat: totalFat, photoData: photoData)
+            meal.mealCategory = mealCategory
             meal.analysisSource = analysisSource.rawValue
             meal.analysisConfidence = analysisSource == .manual ? nil : analysisConfidence
             meal.analysisNotes = analysisNotes
@@ -351,7 +360,7 @@ extension UIImage {
     }
 }
 
-private enum MealPhoto {
+enum MealPhoto {
     /// Downsample library images before full decode to avoid large-image memory spikes.
     static func jpeg(_ data: Data) -> Data? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),

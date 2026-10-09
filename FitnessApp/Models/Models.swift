@@ -31,6 +31,8 @@ import SwiftData
     var carbs: Double
     var fat: Double
     var isBreakfast: Bool
+    /// Empty means a legacy/time-inferred category; no meal record is duplicated.
+    var mealCategory: String = ""
     var analysisSource: String = "manual"
     var analysisConfidence: Double? = nil
     var analysisNotes: String = ""
@@ -121,5 +123,29 @@ import SwiftData
     var text: String
     init(weekStart: Date, text: String) {
         self.weekStart = weekStart; self.generatedAt = .now; self.text = text
+    }
+}
+
+// Only archive-specific metadata is stored; existing fitness records remain canonical.
+@Model final class GrowthMilestone {
+    @Attribute(.unique) var key: String
+    var date: Date
+    var kind: String
+    var title: String
+    var detail: String
+    var isAutomatic: Bool
+    init(key: String = UUID().uuidString, date: Date, kind: String = "manual", title: String, detail: String, isAutomatic: Bool = false) {
+        self.key = key; self.date = date; self.kind = kind; self.title = title; self.detail = detail; self.isAutomatic = isAutomatic
+    }
+}
+
+@Model final class ProgressPhoto {
+    var id: UUID = UUID()
+    var date: Date
+    var angle: String
+    var notes: String
+    @Attribute(.externalStorage) var photoData: Data?
+    init(date: Date, angle: String, notes: String = "", photoData: Data) {
+        self.date = date; self.angle = angle; self.notes = notes; self.photoData = photoData
     }
 }

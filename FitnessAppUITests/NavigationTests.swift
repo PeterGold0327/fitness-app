@@ -116,6 +116,43 @@ import XCTest
         XCTAssertTrue(app.buttons["保存"].exists)
         attachScreenshot("zh-Hans food analysis settings")
     }
+
+    func testProgressArchiveNavigationAndManualMilestone() {
+        launchFreshApp()
+        app.tabBars.buttons["Progress"].tap()
+        for (link, title) in [("Overview", "Overview"), ("Growth Timeline", "Growth Timeline"),
+                               ("Milestones", "Milestones"), ("Progress Photos", "Progress Photos")] {
+            tap(link)
+            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 3))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        tap("Milestones"); tap("Add milestone")
+        enter("First tournament", in: "Milestone title")
+        if app.buttons["Done"].exists { app.buttons["Done"].tap() }
+        app.navigationBars.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["First tournament"].waitForExistence(timeout: 3))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        tap("Growth Timeline")
+        for _ in 0..<6 {
+            if app.staticTexts["First tournament"].exists { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.staticTexts["First tournament"].exists)
+    }
+    func testChineseGrowthTimelineAndExportNavigation() {
+        app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["进展"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["进展"].tap()
+        for label in ["概览", "成长时间线", "里程碑", "成长照片"] { XCTAssertTrue(app.buttons[label].firstMatch.exists) }
+        tap("成长时间线")
+        XCTAssertTrue(app.navigationBars["成长时间线"].waitForExistence(timeout: 3))
+        tap("导出成长档案")
+        XCTAssertTrue(app.navigationBars["导出成长档案"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.switches["全部历史"].exists)
+        app.navigationBars.buttons["关闭"].tap()
+    }
     private func attachScreenshot(_ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

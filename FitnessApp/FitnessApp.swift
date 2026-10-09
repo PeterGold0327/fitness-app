@@ -9,7 +9,7 @@ import SwiftData
         do {
             let schema = Schema([UserProfile.self, DailyNutrition.self, Meal.self, FoodItem.self,
                                  WeightEntry.self, WorkoutSession.self, ExerciseEntry.self, SleepEntry.self,
-                                 BadmintonEntry.self, FoodInventoryItem.self, WeeklySummary.self])
+                                 BadmintonEntry.self, FoodInventoryItem.self, WeeklySummary.self, GrowthMilestone.self, ProgressPhoto.self])
             #if DEBUG
             let testing = ProcessInfo.processInfo.arguments.contains("--uitesting")
             #else

@@ -1,13 +1,14 @@
 #if !SWIFT_PACKAGE
 import XCTest
 import SwiftData
+import UIKit
 @testable import LeanLog
 
 @MainActor final class PersistenceTests: XCTestCase {
     private func makeStore(url: URL? = nil) throws -> (ModelContainer, AppStore) {
         let schema = Schema([UserProfile.self, DailyNutrition.self, Meal.self, FoodItem.self,
                              WeightEntry.self, WorkoutSession.self, ExerciseEntry.self, SleepEntry.self,
-                             BadmintonEntry.self, FoodInventoryItem.self, WeeklySummary.self])
+                             BadmintonEntry.self, FoodInventoryItem.self, WeeklySummary.self, GrowthMilestone.self, ProgressPhoto.self])
         let configuration: ModelConfiguration
         if let url { configuration = ModelConfiguration(schema: schema, url: url) }
         else { configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true) }
@@ -265,6 +266,85 @@ import SwiftData
             protein: 10, carbs: 0, fat: 0, photoData: nil, estimatedItems: [food], source: .api))
         XCTAssertEqual(saved.name, "Lunch"); XCTAssertEqual(saved.calories, 100)
         XCTAssertTrue(saved.foods.isEmpty)
+    }
+
+    func testTimelineUsesExistingRecordsAndPhotosWithoutCreatingTimelineCopies() throws {
+        let (_, app) = try makeStore()
+        let bytes = Data([1, 2, 3])
+        let meal = Meal(date: app.currentDate, name: "Lunch", calories: 500, protein: 30, photoData: bytes)
+        meal.mealCategory = "lunch"
+        XCTAssertTrue(app.logMeal(meal))
+        let day = GrowthTimeline.day(app.currentDate, history: app.timelineHistory, calendar: .current, asOf: app.currentDate)
+        XCTAssertEqual(day.meals.first?.id, meal.id); XCTAssertEqual(day.meals.first?.photo, bytes)
+        XCTAssertEqual(try app.context.fetch(FetchDescriptor<Meal>()).count, 1)
+        XCTAssertTrue(app.updateMeal(meal, name: "Corrected lunch", date: meal.date, calories: 700,
+                                    protein: 40, carbs: 0, fat: 0, photoData: bytes, category: "dinner"))
+        XCTAssertEqual(app.timelineHistory.meals.first?.name, "Corrected lunch")
+        XCTAssertEqual(app.timelineHistory.meals.first?.category, .dinner)
+        app.deleteMeal(meal)
+        XCTAssertTrue(app.timelineHistory.meals.isEmpty)
+        XCTAssertTrue(app.timelineHistory.photos.isEmpty, "Food photos must not become progress-photo copies")
+    }
+    func testAutomaticMilestonesArePersistedIdempotentlyAndReconcileDeletions() throws {
+        let (container, app) = try makeStore()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: app.currentDate)!
+        XCTAssertTrue(app.logWeight(kilograms: 63.4, date: yesterday))
+        XCTAssertTrue(app.logWeight(kilograms: 64.2, date: app.currentDate))
+        for _ in 0..<3 { app.reload() }
+        XCTAssertEqual(app.milestones.filter { $0.key == "weight-up-64" }.count, 1)
+        let reopened = AppStore(context: ModelContext(container))
+        XCTAssertEqual(reopened.milestones.filter { $0.key == "weight-up-64" }.count, 1)
+        XCTAssertTrue(app.logMilestone(title: "Personal milestone", detail: "Private note", date: app.currentDate))
+        app.deleteWeight(try XCTUnwrap(app.weights.last))
+        XCTAssertFalse(app.milestones.contains { $0.key == "weight-up-64" })
+        XCTAssertTrue(app.milestones.contains { !$0.isAutomatic && $0.title == "Personal milestone" })
+    }
+    func testProgressPhotosAndManualMilestonesSurviveFileBackedReopening() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("timeline.store")
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2))
+        let image = renderer.image { $0.cgContext.fill(CGRect(x: 0, y: 0, width: 2, height: 2)) }
+        let data = try XCTUnwrap(image.jpegData(compressionQuality: 0.8))
+        try autoreleasepool {
+            let (_, app) = try makeStore(url: url)
+            XCTAssertTrue(app.logProgressPhoto(data: data, angle: .back, date: app.currentDate, notes: "First photo"))
+            XCTAssertTrue(app.logMilestone(title: "First photo", detail: "Personal note", date: app.currentDate))
+            XCTAssertFalse(app.logProgressPhoto(data: Data([1]), angle: .front, date: app.currentDate, notes: ""))
+        }
+        try autoreleasepool {
+            let (_, app) = try makeStore(url: url)
+            XCTAssertTrue(app.isReady)
+            let photo = try XCTUnwrap(app.timelineHistory.photos.first)
+            XCTAssertEqual(photo.data, data); XCTAssertEqual(photo.angle, .back); XCTAssertEqual(photo.notes, "First photo")
+            XCTAssertTrue(app.milestones.contains { $0.title == "First photo" })
+            app.deleteProgressPhoto(try XCTUnwrap(app.progressPhotos.first))
+            XCTAssertTrue(app.progressPhotos.isEmpty)
+        }
+    }
+    func testAddingArchiveModelsPreservesExistingFileBackedLogs() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("migration.store")
+        try autoreleasepool {
+            let original = Schema([UserProfile.self, DailyNutrition.self, Meal.self, FoodItem.self,
+                                   WeightEntry.self, WorkoutSession.self, ExerciseEntry.self, SleepEntry.self,
+                                   BadmintonEntry.self, FoodInventoryItem.self, WeeklySummary.self])
+            let container = try ModelContainer(for: original, configurations: [ModelConfiguration(schema: original, url: url)])
+            let meal = Meal(name: "Existing meal", calories: 500, protein: 30)
+            container.mainContext.insert(meal)
+            container.mainContext.insert(WeightEntry(kilograms: 63.4))
+            try container.mainContext.save()
+        }
+        try autoreleasepool {
+            let (_, app) = try makeStore(url: url)
+            XCTAssertTrue(app.isReady)
+            XCTAssertEqual(app.meals.first?.name, "Existing meal")
+            XCTAssertEqual(app.weights.first?.kilograms, 63.4)
+            XCTAssertTrue(app.logMilestone(title: "New metadata", detail: "", date: app.currentDate))
+        }
     }
 
 }

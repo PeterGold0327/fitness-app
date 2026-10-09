@@ -12,7 +12,7 @@ let package = Package(
                     "Services/HealthService.swift", "Services/KeychainFoodCredentials.swift", "Resources/Info.plist",
                     "Resources/FitnessApp.entitlements", "Resources/PrivacyInfo.xcprivacy",
                     "Resources/en.lproj/InfoPlist.strings", "Resources/zh-Hans.lproj/InfoPlist.strings"],
-                sources: ["Services/FitnessLogic.swift", "Services/FoodPhotoService.swift", "Services/L10n.swift"],
+                sources: ["Services/FitnessLogic.swift", "Services/FoodPhotoService.swift", "Services/L10n.swift", "Services/GrowthTimeline.swift", "Services/TimelineMilestones.swift", "Services/TimelineMarkdown.swift"],
                 resources: [.process("Resources/en.lproj/Localizable.strings"), .process("Resources/zh-Hans.lproj/Localizable.strings")]),
         .testTarget(name: "FitnessCoreTests", dependencies: ["FitnessCore"], path: "FitnessAppTests")
     ]

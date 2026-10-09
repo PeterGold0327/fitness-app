@@ -17,7 +17,8 @@ The cloud machine is Linux. **The iOS app has not been compiled or launched with
 - **Home:** daily nutrition, remaining targets, breakfast state, quick logging, activity, weight averages and sleep.
 - **Nutrition:** dated food log, add/edit/delete meals, camera/library attachment, two-step food-photo detection/review and nutrition estimation via OpenAI, or editable demo estimates, and three meal suggestions with specific grams and estimated macros.
 - **Training:** date/name and multiple exercise rows per gym session, load/sets/reps/target reps/RPE/notes, edit/delete sessions, simple weekly progression, nearby badminton warnings and a date-only badminton log (including upcoming dates).
-- **Progress:** 28-day weight graph and 7-day moving averages, 2/4-week comparisons, nutrition adherence, live last-seven-day summary and saved summary snapshots.
+- **Progress:** Overview retains the 28-day weight graph and 7-day moving averages, 2/4-week comparisons, nutrition adherence, live last-seven-day summary and saved summary snapshots.
+- **Growth Timeline / 成长时间线:** day/week/month/year history from existing logs, period summaries and previous-month comparison, automatic/manual milestones, private front/side/back progress photos and comparison pairs, On This Day, and Markdown + photo ZIP export to Files. Find Overview, Timeline, Milestones and Photos inside Progress. See [archive design and validation](docs/GROWTH_TIMELINE.md).
 - **Settings:** profile and nutrition targets, breakfast portions, kg/lb display, inventory, Health access and food-photo API configuration.
 - **HealthKit:** read steps, active energy, latest heart rate today, recent workouts, weight and sleep; manual logging remains usable without Health access. Watch data is read via HealthKit, not a separate Watch app.
 
@@ -37,7 +38,7 @@ English is the fallback; Simplified Chinese (`zh-Hans`) follows the iPhone langu
 - Health read denial is intentionally hidden by Apple. Empty values mean no readable samples or no permission, never proof of zero activity. Previously imported sleep/weight stays locally cached after permission revocation. Deleting an imported weigh-in does not delete it from Health; refresh may reimport it.
 - Sleep merges overlapping asleep samples (Watch/iPhone duplicates) in noon-to-noon windows assigned to the waking day. In-bed/awake records are excluded; naps can contribute to the daily total. There is no manual fatigue/mood module.
 - Weekly nutrition averages use **logged days**, with coverage shown. Sleep averages use available nights. No-data days are not zeros. Adherence compares past intake to your current targets, not historical target snapshots.
-- Local SwiftData only. No export/backup feature in this MVP; deleting the app can remove its local logs. There is no cloud sync, authentication, subscription or social module.
+- Local SwiftData only. Growth Timeline can export a Markdown/photo ZIP as a manual portable archive; it is not a restorable database backup. Deleting the app can remove local logs and progress photos. There is no cloud sync, authentication, subscription or social module.
 
 ## Structure
 
@@ -75,7 +76,7 @@ xcodebuild -project FitnessApp.xcodeproj -scheme LeanLog \
   -derivedDataPath DerivedData test CODE_SIGNING_ALLOWED=NO
 ```
 
-**Quality pass:** 73 portable XCTest cases pass on Linux. Xcode also contains 19 SwiftData tests, 2 configuration tests and 5 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
+**Quality pass:** 103 portable XCTest cases pass on Linux. Xcode also contains 23 SwiftData tests, 2 configuration tests and 7 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
 
 Only if files are added/removed, regenerate project references using `python3 scripts/generate_project.py` (this replaces the generated project and scheme; preserve any custom signing/project settings first). Otherwise open the checked-in project directly.
 
@@ -90,5 +91,6 @@ Only if files are added/removed, regenerate project references using `python3 sc
 - Grant all, some and no Health read types; refresh on returning to foreground. Check real Watch steps/workouts/sleep, overlapping sleep, manual weigh-in precedence and missing-data messaging.
 - Verify a midnight/day rollover and a timezone change without double breakfast or daily entries. Historical days use the device's local calendar at entry time; cross-timezone history is not normalized in this MVP.
 - Review the last-seven-day summary and nutrition coverage, save it, relaunch and confirm local persistence.
+- Validate Growth Timeline after upgrading an existing install: original logs/photos remain intact, milestones do not duplicate, progress photos reopen locally, period navigation and Chinese layouts work, and an exported ZIP opens in Files with every referenced image. See the archive checklist.
 
 No simulator/device behavior or real Health reads have been claimed as verified in this Linux environment.

@@ -1,7 +1,7 @@
 import SwiftUI
 import Charts
 
-struct ProgressViewScreen: View {
+struct ProgressOverviewView: View {
     @EnvironmentObject private var store: AppStore
     @Binding var sheet: AppSheet?
     private var chartWeights: [WeightEntry] { store.weights.filter { EntryValidation.weight($0.kilograms) && $0.day >= store.startOfRecentDays(28) && $0.day <= Date() } }
@@ -25,7 +25,7 @@ struct ProgressViewScreen: View {
                 }
             }
             weightHistorySection
-        }.navigationTitle(L10n.text("Progress"))
+        }.navigationTitle(L10n.text("Overview"))
     }
 
     private var weightHistorySection: some View {
