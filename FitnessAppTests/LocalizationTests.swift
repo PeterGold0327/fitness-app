@@ -102,4 +102,33 @@ final class LocalizationTests: XCTestCase {
         XCTAssertTrue(result.contains("4 个已记录日")); XCTAssertFalse(result.contains("%@"))
     }
 
+    func testHomeGreetingUsesLocalTimeAtNoonAndEveningBoundaries() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Australia/Brisbane"))
+        for (hour, minute, second, key) in [
+            (0, 0, 0, "Good morning, Duoduo"),
+            (11, 59, 59, "Good morning, Duoduo"),
+            (12, 0, 0, "Good afternoon, Duoduo"),
+            (17, 59, 59, "Good afternoon, Duoduo"),
+            (18, 0, 0, "Good evening, Duoduo"),
+            (23, 59, 59, "Good evening, Duoduo")
+        ] {
+            let date = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 9, hour: hour, minute: minute, second: second)))
+            XCTAssertEqual(L10n.homeGreeting(at: date, calendar: calendar), L10n.text(key))
+        }
+        let localNoon = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 9, hour: 12)))
+        var utc = calendar; utc.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        XCTAssertEqual(L10n.homeGreeting(at: localNoon, calendar: utc), L10n.text("Good morning, Duoduo"))
+        XCTAssertEqual(L10n.homeGreeting(at: localNoon, calendar: calendar), L10n.text("Good afternoon, Duoduo"))
+    }
+    func testHomeGreetingTranslationsUseTheRequestedNickname() throws {
+        let english = try strings("en"), chinese = try strings("zh-Hans")
+        for (key, translation) in [("Good morning, Duoduo", "早上好，多多"),
+                                   ("Good afternoon, Duoduo", "下午好，多多"),
+                                   ("Good evening, Duoduo", "晚上好，多多")] {
+            XCTAssertEqual(english[key], key)
+            XCTAssertEqual(chinese[key], translation)
+        }
+    }
+
 }

@@ -9,10 +9,12 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L10n.text("Hello, %@", store.profile.name)).font(.largeTitle.bold())
-                    Text(store.currentDate.formatted(date: .complete, time: .omitted)).foregroundStyle(.secondary)
-                }.padding(.vertical, 6)
+                TimelineView(.everyMinute) { context in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L10n.homeGreeting(at: context.date)).font(.largeTitle.bold())
+                        Text(store.currentDate.formatted(date: .complete, time: .omitted)).foregroundStyle(.secondary)
+                    }.padding(.vertical, 6)
+                }
                 RecommendationCard(actions: DailyCoach.actions(input))
                 quickActions
                 yesterdayCard

@@ -14,6 +14,13 @@ enum L10n {
         let format = bundle.localizedString(forKey: key, value: key, table: "Localizable")
         return arguments.isEmpty ? format : String(format: format, locale: Locale.current, arguments: arguments)
     }
+    static func homeGreeting(at date: Date, calendar: Calendar = .current) -> String {
+        switch calendar.component(.hour, from: date) {
+        case 0..<12: return text("Good morning, Duoduo")
+        case 12..<18: return text("Good afternoon, Duoduo")
+        default: return text("Good evening, Duoduo")
+        }
+    }
     static var responseLanguage: String {
         bundle.preferredLocalizations.first?.hasPrefix("zh") == true ? "Simplified Chinese" : "English"
     }
