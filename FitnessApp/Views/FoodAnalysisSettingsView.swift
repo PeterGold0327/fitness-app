@@ -12,7 +12,6 @@ struct FoodAnalysisSettingsView: View {
             providerSection
             if draft.mode != .mock {
                 credentialSection
-                fallbackSection
                 uploadSection
             }
             if let message = settings.message { Section { Text(message).foregroundStyle(.red) } }
@@ -34,15 +33,6 @@ struct FoodAnalysisSettingsView: View {
         Section(L10n.text("Photo upload")) {
             Text(L10n.text("Tapping Analyze uploads that photo to %@. Nothing uploads when you select/capture a photo. Calls may incur your provider's API charges.", String(describing: draft.endpointURL?.host ?? L10n.text("the configured provider"))))
             Text(L10n.text("OpenAI requests set store=false. Provider processing and retention policies still apply. No photo/request/key is written to debug logs.")).font(.caption)
-        }
-    }
-
-    private var fallbackSection: some View {
-        Section(L10n.text("When the API fails")) {
-            Toggle(L10n.text("Allow labelled demo fallback"), isOn: $draft.allowDemoFallback)
-            Text(draft.allowDemoFallback
-                ? L10n.text("Development/testing only. A failed API call may show fixed demo items, clearly labelled as fallback. Verify or replace every value.")
-                : L10n.text("Your existing draft stays intact. Retry, switch to demo mode, or enter the meal manually. No automatic fake result.")).font(.caption)
         }
     }
 
@@ -68,13 +58,19 @@ struct FoodAnalysisSettingsView: View {
             if draft.mode == .mock {
                 Text(L10n.text("Demo mode never uploads a photo. It returns labelled sample items for development/testing.")).font(.caption)
             } else {
-                if draft.mode == .responsesCompatible {
-                    TextField(L10n.text("HTTPS Responses API URL"), text: $draft.customEndpoint)
-                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    Text(L10n.text("Must implement OpenAI's Responses image input and strict JSON-schema output format. A different API needs a service adapter.")).font(.caption)
-                } else { Text(FoodAnalysisConfiguration.openAIEndpoint).font(.caption).textSelection(.enabled) }
-                TextField(L10n.text("Vision model ID"), text: $draft.model).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Text(L10n.text("Default: gpt-4.1-mini. Choose a model supporting image inputs and Structured Outputs.")).font(.caption)
+                DisclosureGroup(L10n.text("Advanced provider settings")) {
+                    if draft.mode == .responsesCompatible {
+                        TextField(L10n.text("HTTPS Responses API URL"), text: $draft.customEndpoint)
+                            .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Text(L10n.text("Must implement OpenAI's Responses image input and strict JSON-schema output format. A different API needs a service adapter.")).font(.caption)
+                    } else { Text(FoodAnalysisConfiguration.openAIEndpoint).font(.caption).textSelection(.enabled) }
+                    TextField(L10n.text("Vision model ID"), text: $draft.model).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Text(L10n.text("Default: gpt-4.1-mini. Choose a model supporting image inputs and Structured Outputs.")).font(.caption)
+                    Toggle(L10n.text("Allow labelled demo fallback"), isOn: $draft.allowDemoFallback)
+                    Text(draft.allowDemoFallback
+                        ? L10n.text("Development/testing only. A failed API call may show fixed demo items, clearly labelled as fallback. Verify or replace every value.")
+                        : L10n.text("Your existing draft stays intact. Retry, switch to demo mode, or enter the meal manually. No automatic fake result.")).font(.caption)
+                }
             }
         }
     }

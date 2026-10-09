@@ -7,6 +7,7 @@ import ImageIO
 struct NumberField: View {
     var title: String
     @Binding var value: Double
+    var allowsBlank = false
     @Environment(\.locale) private var locale
     @State private var text = ""
     var body: some View {
@@ -18,7 +19,7 @@ struct NumberField: View {
                     .keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(minWidth: 90, maxWidth: 140)
                     .accessibilityLabel(title)
             }
-            if !value.isFinite { Text(L10n.text("Enter a valid number.")).font(.caption).foregroundStyle(.red) }
+            if !value.isFinite && (!allowsBlank || !text.isEmpty) { Text(L10n.text("Enter a valid number.")).font(.caption).foregroundStyle(.red) }
         }
         .onAppear { syncText() }
         .onChange(of: text) { _, input in value = NumericInput.parse(input, locale: locale) ?? .nan }
@@ -56,6 +57,7 @@ struct MealEditor: View {
     private var busy: Bool { analyzing || loadingPhoto || requestingCamera }
     @State private var mealContext = ""
     @State private var hasFoodReview = false
+    @State private var originalItems: [EstimatedFoodItem]?
     @State private var estimatedItems: [EstimatedFoodItem] = []
     @State private var analysisSource: FoodAnalysisSource = .manual
     @State private var analysisConfidence = 0.0
@@ -110,6 +112,7 @@ struct MealEditor: View {
                                 EstimatedFoodItem(name: $0.name, grams: $0.grams, calories: $0.calories, protein: $0.protein,
                                     carbs: $0.carbs, fat: $0.fat, confidence: $0.confidence ?? 0, uncertaintyNotes: $0.uncertaintyNotes)
                             }
+                            originalItems = estimatedItems
                         }
                     } else if startWithCamera { await openCamera() }
                 }
@@ -254,11 +257,23 @@ struct MealEditor: View {
         defer { analyzing = false }
         do {
             let analyzer = try analysisSettings.analyzer()
-            let estimate = try await analyzer.analyze(imageData: data, context: mealContext)
+            let editedItems = estimatedItems
+            let estimate: FoodEstimate
+            if let originalItems, estimatedItems != originalItems {
+                let reviewed = FoodEstimate(name: name, items: estimatedItems, confidence: analysisConfidence, uncertaintyNotes: analysisNotes, source: analysisSource)
+                let refreshed = try await analyzer.estimateNutrition(imageData: data, reviewed: reviewed, context: mealContext)
+                estimate = try FoodReview.preserveCorrections(refreshed, baseline: originalItems, edited: reviewed)
+            } else {
+                estimate = try await analyzer.analyze(imageData: data, context: mealContext)
+            }
             try Task.checkCancellation()
+            let hadCorrections = originalItems.map { $0 != estimatedItems } ?? false
             name = estimate.name; calories = estimate.calories; protein = estimate.protein
             carbs = estimate.carbs; fat = estimate.fat; estimatedItems = estimate.items
             analysisSource = estimate.source; analysisConfidence = estimate.confidence; analysisNotes = estimate.uncertaintyNotes
+            if let baseline = originalItems, hadCorrections {
+                originalItems = FoodReview.nextCorrectionBaseline(baseline, edited: editedItems, refreshed: estimate.items)
+            } else { originalItems = estimate.items }
             hasFoodReview = true
         } catch is CancellationError { return }
         catch { self.error = L10n.text("Analysis failed: %@. You can still enter the meal manually.", String(describing: error.localizedDescription)) }

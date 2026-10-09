@@ -11,6 +11,9 @@ import XCTest
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
     }
     private func tap(_ title: String) {
+        if ["Log food", "What should I eat now?", "Log gym workout", "Log weight", "Log badminton", "记录饮食"].contains(title), app.buttons["home.moreLogging"].isHittable {
+            app.buttons["home.moreLogging"].tap()
+        }
         let button = app.buttons[title].firstMatch
         for _ in 0..<6 {
             if button.exists && button.isHittable { button.tap(); return }
@@ -90,7 +93,7 @@ import XCTest
         app.launchArguments = ["--uitesting", "-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         XCTAssertTrue(app.navigationBars["今日"].waitForExistence(timeout: 10))
-        for (tab, title) in [("营养", "营养"), ("训练", "训练"), ("进展", "进展"), ("设置", "设置"), ("首页", "今日")] {
+        for (tab, title) in [("营养", "营养"), ("运动", "运动"), ("进展", "进展"), ("设置", "设置"), ("首页", "今日")] {
             app.tabBars.buttons[tab].tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 3))
         }
@@ -210,6 +213,36 @@ import XCTest
         }
     }
 
+
+    func testAgentHomeAndTrainingTemplateUseRealNavigation() {
+        launchFreshApp()
+        XCTAssertTrue(app.descendants(matching: .any)["coach.recommendation"].firstMatch.exists)
+        tap("View today's advice")
+        XCTAssertTrue(app.navigationBars["Today's Recommendation"].waitForExistence(timeout: 3))
+        app.navigationBars.buttons["Close"].tap()
+        app.tabBars.buttons["Training"].tap()
+        tap("Chest")
+        XCTAssertTrue(app.navigationBars["Chest"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.textFields["Exercise name"].firstMatch.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.navigationBars.buttons["Save"].isEnabled, "Previous reps are not silently logged as today's work")
+        app.navigationBars.buttons["Cancel"].tap()
+        tap("Edit workout templates")
+        XCTAssertTrue(app.navigationBars["Workout templates"].waitForExistence(timeout: 3))
+        tap("Chest")
+        XCTAssertTrue(app.textFields["Exercise name"].firstMatch.exists)
+    }
+    func testCommonMealsAndArchiveRemainReachableInRedesignedTabs() {
+        launchFreshApp()
+        app.tabBars.buttons["Nutrition"].tap()
+        tap("Common meals")
+        XCTAssertTrue(app.navigationBars["Common meals"].waitForExistence(timeout: 3))
+        tap("Log yogurt, oats & banana")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Nutrition"].exists)
+        app.tabBars.buttons["Progress"].tap()
+        app.buttons["progress.timeline"].tap()
+        XCTAssertTrue(app.navigationBars["Growth Timeline"].waitForExistence(timeout: 3))
+    }
     private func attachScreenshot(_ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

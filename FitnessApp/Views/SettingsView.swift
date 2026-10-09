@@ -4,43 +4,39 @@ struct SettingsView: View {
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var health: HealthService
     @EnvironmentObject private var analysisSettings: FoodAnalysisSettings
+    @EnvironmentObject private var library: PersonalLibrary
+    @AppStorage("appearance") private var appearance = "system"
     var body: some View {
         List {
-            personalSettingsSection
-            healthSection
-            foodAnalysisSection
-        }.navigationTitle(L10n.text("Settings"))
-    }
-
-    private var foodAnalysisSection: some View {
-        Section(L10n.text("Food photo analysis")) {
-            NavigationLink(L10n.text("Provider & API credentials")) { FoodAnalysisSettingsView() }
-            Text(analysisSettings.configuration.mode.label).font(.caption).foregroundStyle(.secondary)
-            Text(L10n.text("Analyze a photo, review detected foods and portions, then edit before saving. Manual logging always works.")).font(.caption)
-        }
-    }
-
-    private var healthSection: some View {
-        Section(L10n.text("Apple Health / Watch")) {
-            NavigationLink(L10n.text("Health permissions & data")) { HealthPermissionsView() }
-            Text(health.message).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-
-    private var usesPounds: Binding<Bool> {
-        Binding(
-            get: { store.profile.usesPounds },
-            set: { store.profile.usesPounds = $0; store.save() }
-        )
-    }
-
-    private var personalSettingsSection: some View {
-        Section(L10n.text("Personal settings")) {
-            NavigationLink(L10n.text("Profile, targets & breakfast")) { ProfileEditor() }
-            Toggle(L10n.text("Display weight in pounds"), isOn: usesPounds)
-            NavigationLink(L10n.text("Food inventory (%@)", String(describing: store.inventory.count))) { InventoryView() }
-            Text(L10n.text("Stored on this iPhone with SwiftData. No account, backend, cloud sync or Health writes.")).font(.caption).foregroundStyle(.secondary)
-        }
+            Section(L10n.text("Personal Goals")) {
+                NavigationLink(L10n.text("Profile, targets & breakfast")) { ProfileEditor() }
+                NavigationLink(L10n.text("Workout templates")) { WorkoutTemplatesEditor() }
+            }
+            Section(L10n.text("Apple Health & Data")) {
+                NavigationLink(L10n.text("Health permissions & data")) { HealthPermissionsView() }
+                NavigationLink(L10n.text("Export Archive")) { TimelineExportView(selectedDate: store.currentDate, period: .day) }
+                Text(L10n.text("Watch records appear through Apple Health when readable. This app cannot determine Watch connection or read-denial status.")).font(.caption).foregroundStyle(.secondary)
+                Text(L10n.text("Data stays on this iPhone. iCloud sync is not available yet.")).font(.caption).foregroundStyle(.secondary)
+            }
+            Section(L10n.text("AI Food Recognition")) {
+                NavigationLink(L10n.text("Provider & API credentials")) { FoodAnalysisSettingsView() }
+                Text(analysisSettings.configuration.mode.label).font(.caption).foregroundStyle(.secondary)
+            }
+            Section(L10n.text("Preferences")) {
+                Toggle(L10n.text("Display weight in pounds"), isOn: Binding(get: { store.profile.usesPounds }, set: { store.profile.usesPounds = $0; store.save() }))
+                Picker(L10n.text("Appearance"), selection: $appearance) {
+                    Text(L10n.text("System")).tag("system")
+                    Text(L10n.text("Light")).tag("light")
+                    Text(L10n.text("Dark")).tag("dark")
+                }
+                Button(L10n.text("Language & iPhone settings")) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }
+                NavigationLink(L10n.text("Food inventory (%@)", String(store.inventory.count))) { InventoryView() }
+                NavigationLink(L10n.text("Common meals")) { CommonMealsView() }
+            }
+            if let error = library.error { Section { Text(error).foregroundStyle(.red) } }
+        }.calmList().navigationTitle(L10n.text("Settings"))
     }
 }
 
@@ -48,6 +44,8 @@ struct ProfileEditor: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
+    @EnvironmentObject private var library: PersonalLibrary
+    @State private var goalWeight = 0.0
     @State private var height = 178.0
     @State private var startingWeight = 63.0
     @State private var calories = 2700.0
@@ -58,7 +56,7 @@ struct ProfileEditor: View {
     @State private var oats = 60.0
     @State private var loaded = false
     private var valid: Bool {
-        EntryValidation.profile(height: height, startingWeight: startingWeight, calories: calories,
+        (goalWeight == 0 || EntryValidation.weight(goalWeight)) && EntryValidation.profile(height: height, startingWeight: startingWeight, calories: calories,
             protein: protein, fat: fat, yogurt: yogurt, banana: banana, oats: oats)
     }
     var body: some View {
@@ -66,6 +64,7 @@ struct ProfileEditor: View {
             profileSection
             targetsSection
             breakfastSection
+            if let error = library.error { Section { Text(error).foregroundStyle(.red) } }
             if !valid { Section { Text(L10n.text("Check values: calories 1000–6000, protein 30–300 g, fat 20–200 g, and positive breakfast portions. Protein and fat energy must fit the calorie target.")).foregroundStyle(.red) } }
         }.navigationTitle(L10n.text("Profile & targets")).keyboardDoneButton()
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L10n.text("Save")) { save() }.disabled(!valid) } }
@@ -102,6 +101,7 @@ struct ProfileEditor: View {
             NumberField(title: L10n.text("Calories (kcal)"), value: $calories)
             NumberField(title: L10n.text("Protein (g)"), value: $protein)
             NumberField(title: L10n.text("Fat (g)"), value: $fat)
+            NumberField(title: L10n.text("Goal weight (kg; zero means not set)"), value: $goalWeight)
             Text(carbohydrateTargetText).font(.caption)
             Text(store.trend.advice).font(.subheadline)
             if let adjustment = store.trend.calorieAdjustment {
@@ -123,13 +123,14 @@ struct ProfileEditor: View {
     }
     private func loadProfile() {
         guard !loaded else { return }; loaded = true
+        goalWeight = library.state.goalWeightKG ?? 0
         let p = store.profile
         name = p.name; height = p.heightCM; startingWeight = p.startingWeightKG
         calories = p.calorieTarget; protein = p.proteinTarget; fat = p.fatTarget
         yogurt = p.breakfastYogurtGrams; banana = p.breakfastBananaGrams; oats = p.breakfastOatsGrams
     }
     private func save() {
-        guard valid else { return }
+        guard valid, library.update({ $0.goalWeightKG = goalWeight > 0 ? goalWeight : nil }) else { return }
         let p = store.profile
         p.name = name; p.heightCM = height; p.startingWeightKG = startingWeight
         p.calorieTarget = calories; p.proteinTarget = protein; p.fatTarget = fat
@@ -165,7 +166,12 @@ struct HealthPermissionsView: View {
         List {
             readAccessSection
             permissionHelpSection
-        }.navigationTitle(L10n.text("Apple Health"))
+            Section(L10n.text("Readable Health data")) {
+                MetricRow(title: L10n.text("Steps"), value: health.steps?.wholeText ?? L10n.text("No readable data"))
+                MetricRow(title: L10n.text("Active calories"), value: health.activeCalories.map { L10n.text("%@ kcal", $0.wholeText) } ?? L10n.text("No readable data"))
+                MetricRow(title: L10n.text("Latest heart rate today"), value: health.heartRate.map { L10n.text("%@ bpm", $0.wholeText) } ?? L10n.text("No readable data"))
+            }
+        }.calmList().navigationTitle(L10n.text("Apple Health"))
     }
 
     private var permissionHelpSection: some View {

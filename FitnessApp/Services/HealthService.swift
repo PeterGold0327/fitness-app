@@ -6,6 +6,7 @@ import Combine
     private let store = HKHealthStore()
     @Published var steps: Double?
     @Published var activeCalories: Double?
+    @Published var dailyEnergy: [HealthEnergy] = []
     @Published var heartRate: Double?
     @Published var workouts: [HealthWorkout] = []
     @Published var isLoading = false
@@ -53,17 +54,19 @@ import Combine
         let monthStart = Calendar.current.date(byAdding: .day, value: -28, to: start)!
         var errors: [String] = []
         // Reset the live dashboard on each refresh so denied/empty reads never retain stale values.
-        steps = nil; activeCalories = nil; heartRate = nil; workouts = []; app.healthWorkouts = []
+        steps = nil; activeCalories = nil; heartRate = nil; workouts = []; dailyEnergy = []; app.healthWorkouts = []
         do { steps = try await cumulative(HKQuantityType(.stepCount), unit: .count(), from: start, to: now) }
         catch { errors.append(L10n.text("steps: %@", String(describing: error.localizedDescription))) }
         do { activeCalories = try await cumulative(HKQuantityType(.activeEnergyBurned), unit: .kilocalorie(), from: start, to: now) }
+        catch { errors.append(L10n.text("active energy: %@", String(describing: error.localizedDescription))) }
+        do { dailyEnergy = try await energyDays(from: Calendar.current.date(byAdding: .day, value: -7, to: start)!, to: now) }
         catch { errors.append(L10n.text("active energy: %@", String(describing: error.localizedDescription))) }
         do {
             let samples = try await samples(HKQuantityType(.heartRate), from: start, to: now, limit: 1)
             heartRate = (samples.first as? HKQuantitySample)?.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
         } catch { errors.append(L10n.text("heart rate: %@", String(describing: error.localizedDescription))) }
         do {
-            let week = Calendar.current.date(byAdding: .day, value: -6, to: start)!
+            let week = Calendar.current.date(byAdding: .day, value: -13, to: start)!
             let records = try await samples(HKWorkoutType.workoutType(), from: week, to: now)
             workouts = records.compactMap { sample in
                 guard let workout = sample as? HKWorkout else { return nil }
@@ -77,7 +80,10 @@ import Combine
                 }
                 return HealthWorkout(id: workout.uuid, date: workout.startDate, minutes: workout.duration / 60, label: label,
                     isGym: workout.workoutActivityType == .traditionalStrengthTraining || workout.workoutActivityType == .functionalStrengthTraining,
-                    isBadminton: workout.workoutActivityType == .badminton)
+                    isBadminton: workout.workoutActivityType == .badminton,
+                    endDate: workout.endDate,
+                    activeCalories: workout.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity()?.doubleValue(for: .kilocalorie()),
+                    source: workout.sourceRevision.source.name)
             }
             app.healthWorkouts = workouts
         } catch { errors.append(L10n.text("workouts: %@", String(describing: error.localizedDescription))) }
@@ -106,6 +112,35 @@ import Combine
         message = errors.isEmpty
             ? L10n.text("Health refreshed. Empty fields mean no readable records. Imported weight and sleep remain locally cached; manual weigh-ins take priority.")
             : L10n.text("Some Health data could not refresh: ") + errors.joined(separator: "; ")
+    }
+
+    var usualActiveCalories: Double? {
+        let today = Calendar.current.startOfDay(for: Date())
+        let values = dailyEnergy.filter { $0.day < today }.map(\.calories)
+        return values.count >= 3 ? FitnessLogic.average(values) : nil
+    }
+    var yesterdayActiveCalories: Double? {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        return dailyEnergy.first { Calendar.current.isDate($0.day, inSameDayAs: yesterday) }?.calories
+    }
+    private func energyDays(from: Date, to: Date) async throws -> [HealthEnergy] {
+        try await withCheckedThrowingContinuation { continuation in
+            let type = HKQuantityType(.activeEnergyBurned)
+            let query = HKStatisticsCollectionQuery(quantityType: type,
+                quantitySamplePredicate: HKQuery.predicateForSamples(withStart: from, end: to),
+                options: .cumulativeSum, anchorDate: from, intervalComponents: DateComponents(day: 1))
+            query.initialResultsHandler = { _, collection, error in
+                if let error { continuation.resume(throwing: error); return }
+                var values: [HealthEnergy] = []
+                collection?.enumerateStatistics(from: from, to: to) { statistics, _ in
+                    if let energy = statistics.sumQuantity()?.doubleValue(for: .kilocalorie()), energy.isFinite, energy >= 0 {
+                        values.append(HealthEnergy(day: statistics.startDate, calories: energy))
+                    }
+                }
+                continuation.resume(returning: values)
+            }
+            store.execute(query)
+        }
     }
 
     private func cumulative(_ type: HKQuantityType, unit: HKUnit, from: Date, to: Date) async throws -> Double? {

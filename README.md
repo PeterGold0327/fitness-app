@@ -1,6 +1,8 @@
 # LeanLog — personal fitness MVP
 
-Native iPhone app for nutrition, lean muscle gain, gym training, weight, sleep and simple badminton logging. SwiftUI + SwiftData, iOS 17+, local data, no account or backend. The default profile is 178 cm / 63 kg with 2700 kcal, 130 g protein and 70 g fat targets.
+Native iPhone fitness and nutrition app with an embedded Daily Coach: one or two practical next actions, nutrition photo logging, repeatable gym training and Growth Timeline history. SwiftUI + SwiftData, iOS 17+, local data, no account or backend. The default profile is 178 cm / 63 kg with 2700 kcal, 130 g protein and 70 g fat targets.
+
+The Home tab is a calm card dashboard for yesterday, sleep, today's targets, a selected workout and the next useful action. Common meals can be saved from prior records and logged with one tap. Goals, Health/data, food recognition and preferences are grouped in Settings; theme follows the system or a Light/Dark choice. No SwiftData migration or store replacement is needed. See [Agent-first integration, file inventory and device checks](docs/AGENT_FIRST.md).
 
 ## Run on an iPhone
 
@@ -14,12 +16,12 @@ The cloud machine is Linux. **The iOS app has not been compiled or launched with
 
 ## What's implemented
 
-- **Home:** daily nutrition, remaining targets, breakfast state, quick logging, activity, weight averages and sleep.
-- **Nutrition:** dated food log, add/edit/delete meals, camera/library attachment, one-request food-photo component and nutrition estimates via OpenAI, or editable demo estimates, and three meal suggestions with specific grams and estimated macros.
-- **Training:** date/name and multiple exercise rows per gym session, load/sets/reps/target reps/RPE/notes, edit/delete sessions, simple weekly progression, nearby badminton warnings and a date-only badminton log (including upcoming dates).
+- **Home:** Daily Coach cards with one or two actions, yesterday summary, readable sleep, targets, optional workout selection and three main quick actions; additional logging is in the top-right menu.
+- **Nutrition:** dated food log, add/edit/delete meals, camera/library attachment, one-request food-photo component and nutrition estimates via OpenAI, or editable demo estimates, one primary meal suggestion with optional alternatives, and one-tap common meals.
+- **Training:** today's readable Health activity first, active workout energy (never total energy), editable persistent Chest/Shoulders/Back/Legs templates, automatic previous-session lookup across English/Chinese exercise aliases, per-set weights/reps and one progression suggestion. Legacy workout editing, RPE/targets/notes, badminton dates and manual duration/active-energy fallback remain available.
 - **Progress:** 28-day weight graph and 7-day moving averages, 2/4-week comparisons, nutrition adherence, live last-seven-day summary and saved summary snapshots.
 - **Growth Timeline / 成长时间线:** day/week/month/year history from existing logs, period summaries and previous-month comparison, automatic/manual milestones, private front/side/back progress photos and comparison pairs, On This Day, and Markdown + photo ZIP export to Files. The Progress tab root in `RootView.swift` pins Growth Timeline navigation above the scrolling analytics and links directly to Timeline, Milestones, Photos, On This Day and Export Archive; existing charts and history remain below it. See [archive design and validation](docs/GROWTH_TIMELINE.md).
-- **Settings:** profile and nutrition targets, breakfast portions, kg/lb display, inventory, Health access and food-photo API configuration.
+- **Settings:** goals/profile, Health/data/export, food recognition with advanced provider options, units, system/light/dark appearance, language settings, inventory and common meals.
 - **HealthKit:** read steps, active energy, latest heart rate today, recent workouts, weight and sleep; manual logging remains usable without Health access. Watch data is read via HealthKit, not a separate Watch app.
 
 ## Languages
@@ -76,7 +78,7 @@ xcodebuild -project FitnessApp.xcodeproj -scheme LeanLog \
   -derivedDataPath DerivedData test CODE_SIGNING_ALLOWED=NO
 ```
 
-**Quality pass:** 109 portable XCTest cases pass on Linux. Xcode also contains 23 SwiftData tests, 2 configuration tests and 9 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
+**Quality pass:** 126 portable XCTest cases pass on Linux. Xcode also contains 26 SwiftData tests, 2 configuration tests and 11 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
 
 Only if files are added/removed, regenerate project references using `python3 scripts/generate_project.py` (this replaces the generated project and scheme; preserve any custom signing/project settings first). Otherwise open the checked-in project directly.
 

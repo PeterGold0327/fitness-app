@@ -35,7 +35,7 @@ final class LocalizationTests: XCTestCase {
     }
     func testChineseBundleContainsRealTranslationsForAllFiveTabs() throws {
         let chinese = try localizedBundle("zh-Hans")
-        for (key, expected) in [("Home", "首页"), ("Nutrition", "营养"), ("Training", "训练"),
+        for (key, expected) in [("Home", "首页"), ("Nutrition", "营养"), ("Training", "运动"),
                                 ("Progress", "进展"), ("Settings", "设置")] {
             XCTAssertEqual(chinese.localizedString(forKey: key, value: key, table: "Localizable"), expected)
         }

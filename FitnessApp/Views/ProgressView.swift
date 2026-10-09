@@ -13,6 +13,7 @@ struct ProgressViewScreen: View {
     }
     var body: some View {
         List {
+            progressSummary
             weightSection
             nutritionSection
             gymProgressSection
@@ -25,8 +26,26 @@ struct ProgressViewScreen: View {
                 }
             }
             weightHistorySection
-        }.navigationTitle(L10n.text("Progress"))
+        }.calmList().navigationTitle(L10n.text("Progress"))
             .accessibilityIdentifier("progress.analytics")
+    }
+
+    private var progressSummary: some View {
+        let start = store.startOfRecentDays(14)
+        let interval = DateInterval(start: start, end: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: store.currentDate))!)
+        let summary = GrowthTimeline.summary(history: store.makeTimelineHistory(includePhotoData: false), interval: interval, calendar: .current, asOf: store.currentDate)
+        return Section(L10n.text("Last 14 days")) {
+            SummaryCard(title: L10n.text("Your progress"), symbol: "chart.line.uptrend.xyaxis") {
+                if summary.days.filter({ $0.weight != nil }).count >= 2, let first = summary.startingWeight, let last = summary.endingWeight {
+                    MetricRow(title: L10n.text("Weight change"), value: store.weightText(last - first))
+                } else { Text(L10n.text("More weigh-ins are needed for weight-based advice.")) }
+                MetricRow(title: L10n.text("Average protein on logged days"), value: summary.averageProtein.map { L10n.text("%@ g", $0.wholeText) } ?? L10n.text("No logged meals"))
+                MetricRow(title: L10n.text("Logged strength sessions"), value: String(summary.gymSessions))
+                MetricRow(title: L10n.text("Training days"), value: String(Set(store.workouts.filter { $0.date >= start && $0.date <= store.currentDate }.map { Calendar.current.startOfDay(for: $0.date) } + store.healthWorkouts.filter { $0.date >= start && $0.date <= store.currentDate }.map { Calendar.current.startOfDay(for: $0.date) }).count))
+                Text(store.trend.weeklyGain != nil ? store.trend.advice : L10n.text("More weigh-ins are needed for weight-based advice.")).font(.callout)
+                Text(L10n.text("Nutrition recorded on %@ of 14 days.", String(summary.nutritionDays))).font(.caption).foregroundStyle(.secondary)
+            }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+        }
     }
 
     private var weightHistorySection: some View {

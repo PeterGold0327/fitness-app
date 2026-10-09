@@ -231,6 +231,7 @@ enum FitnessLogic {
 }
 
 // Framework-independent Health import values, also used by portable sleep tests.
+struct HealthEnergy { let day: Date; let calories: Double }
 struct HealthWeight { let date: Date; let kilograms: Double }
 struct HealthSleep { let day: Date; let hours: Double }
 struct HealthWorkout: Identifiable {
@@ -240,6 +241,9 @@ struct HealthWorkout: Identifiable {
     let label: String
     var isGym = false
     var isBadminton = false
+    var endDate: Date? = nil
+    var activeCalories: Double? = nil
+    var source: String? = nil
 }
 
 enum NumericInput {

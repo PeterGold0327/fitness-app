@@ -5,7 +5,7 @@ import OSLog
 
 // Small shared sheet router; each feature owns its own form and validation.
 enum AppSheet: Identifiable {
-    case meal(Meal?), foodPhoto, recommendations, weight(WeightEntry?), workout(WorkoutSession?), badminton
+    case meal(Meal?), foodPhoto, recommendations, weight(WeightEntry?), workout(WorkoutSession?), badminton, coach, template(TrainingSplit)
     var id: String {
         switch self {
         case .meal(let meal): return "meal-\(meal?.id.uuidString ?? "new")"
@@ -14,6 +14,8 @@ enum AppSheet: Identifiable {
         case .weight(let entry): return "weight-\(entry.map { String($0.day.timeIntervalSince1970) } ?? "new")"
         case .workout(let workout): return "workout-\(workout?.id.uuidString ?? "new")"
         case .badminton: return "badminton"
+        case .coach: return "coach"
+        case .template(let split): return "template-\(split.rawValue)"
         }
     }
 }
@@ -22,6 +24,7 @@ struct RootView: View {
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var health: HealthService
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("appearance") private var appearance = "system"
     @State private var sheet: AppSheet?
     private let navigationLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "LeanLog", category: "Navigation")
     var body: some View {
@@ -35,6 +38,7 @@ struct RootView: View {
                 } actions: { Button(L10n.text("Retry loading")) { store.reload() } }
             }
         }
+        .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         .storeErrorBanner()
         .sheet(item: $sheet) { route in
             Group {
@@ -45,6 +49,8 @@ struct RootView: View {
                 case .weight(let existing): WeightEditor(existing: existing)
                 case .workout(let existing): WorkoutEditor(existing: existing)
                 case .badminton: BadmintonEditor()
+                case .coach: DailyCoachView()
+                case .template(let split): TemplateWorkoutEditor(split: split)
                 }
             }.storeErrorBanner()
         }

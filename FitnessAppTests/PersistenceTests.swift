@@ -347,5 +347,64 @@ import UIKit
         }
     }
 
+    func testPerSetHistoryPersistsAndResolvesEnglishChineseAliases() throws {
+        let (container, _) = try makeStore()
+        let now = Date()
+        let app = AppStore(context: container.mainContext, now: { now })
+        XCTAssertTrue(app.saveWorkout(nil, name: "Chest", date: now.addingTimeInterval(-3 * 86400), exercises: [
+            ExerciseEntry(name: "Barbell Bench Press", weightKG: 60, sets: 3, reps: 8, targetReps: 10, rpe: 8)
+        ]))
+        let rows = [10, 9, 8].map { ExerciseEntry(name: "杠铃卧推", weightKG: 60, sets: 1, reps: $0, targetReps: 10, rpe: 8, targetSets: 1) }
+        XCTAssertTrue(app.saveWorkout(nil, name: "胸", date: now.addingTimeInterval(-3600), exercises: rows))
+        let reopened = AppStore(context: ModelContext(container), now: { now })
+        let history = reopened.exerciseHistory("平板卧推")
+        XCTAssertEqual(history.count, 2)
+        XCTAssertEqual(history.first?.sets.map(\.reps), [10, 9, 8])
+        XCTAssertEqual(history.last?.sets.map(\.reps), [8, 8, 8])
+        XCTAssertEqual(reopened.workouts.count, 2)
+        XCTAssertEqual(reopened.exerciseHistory("Incline Dumbbell Press").count, 0)
+    }
+    func testCommonMealLogsIndependentItemsWithoutChangingOriginalMealOrPhoto() throws {
+        let (container, _) = try makeStore()
+        let suite = "LeanLog.tests.\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let library = PersonalLibrary(defaults: defaults)
+        let app = AppStore(context: container.mainContext, library: library)
+        let meal = Meal(name: "牛肉饭", calories: 650, protein: 45, carbs: 70, fat: 20, photoData: Data([1, 2, 3]))
+        meal.foods = [FoodItem(name: "牛肉饭", grams: 400, calories: 650, protein: 45, carbs: 70, fat: 20, confidence: 0)]
+        XCTAssertTrue(app.logMeal(meal))
+        XCTAssertTrue(app.saveMealTemplate(meal))
+        let template = try XCTUnwrap(library.state.meals.first)
+        XCTAssertTrue(app.logMealTemplate(template))
+        let reopened = AppStore(context: ModelContext(container), library: PersonalLibrary(defaults: defaults))
+        XCTAssertEqual(reopened.meals.count, 2)
+        XCTAssertEqual(reopened.library.state.meals.count, 1)
+        let original = try XCTUnwrap(reopened.meals.first { $0.id == meal.id })
+        let logged = try XCTUnwrap(reopened.meals.first { $0.id != meal.id })
+        XCTAssertEqual(original.photoData, Data([1, 2, 3]))
+        XCTAssertEqual(logged.calories, 650)
+        XCTAssertNotEqual(original.foods.first?.persistentModelID, logged.foods.first?.persistentModelID)
+        XCTAssertFalse(logged.isBreakfast)
+    }
+
+    func testManualActivityMetadataFollowsWorkoutEditsAndDeletes() throws {
+        let (container, _) = try makeStore()
+        let suite = "LeanLog.tests.\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let library = PersonalLibrary(defaults: defaults)
+        let app = AppStore(context: container.mainContext, library: library)
+        let date = Date().addingTimeInterval(-3 * 86400)
+        func rows() -> [ExerciseEntry] { [ExerciseEntry(name: "Bench Press", weightKG: 60, sets: 1, reps: 10, targetReps: 10, rpe: 8)] }
+        XCTAssertTrue(app.saveWorkout(nil, name: "Chest", date: date, exercises: rows()))
+        let workout = try XCTUnwrap(app.workouts.first)
+        XCTAssertTrue(library.update { $0.manualActivities.append(ManualActivityRecord(date: date, badminton: false, workoutID: workout.id, minutes: 58, activeCalories: 286)) })
+        let corrected = date.addingTimeInterval(86400)
+        XCTAssertTrue(app.saveWorkout(workout, name: "Chest", date: corrected, exercises: rows()))
+        XCTAssertEqual(library.state.manualActivities.first?.date, corrected)
+        app.deleteWorkout(workout)
+        XCTAssertTrue(library.state.manualActivities.isEmpty)
+        XCTAssertTrue(app.workouts.isEmpty)
+    }
+
 }
 #endif

@@ -120,6 +120,40 @@ enum FoodReview {
         try validate(context: context)
         guard reviewed.valid else { throw FoodAnalysisError.invalidResponse }
     }
+    /// Re-analysis can refresh untouched nutrition, but must retain current manual corrections.
+    static func preserveCorrections(_ result: FoodEstimate, baseline: [EstimatedFoodItem], edited: FoodEstimate) throws -> FoodEstimate {
+        var merged = try merge(result, reviewed: edited)
+        for index in edited.items.indices {
+            merged.items[index].calories = (merged.items[index].calories / 5).rounded() * 5
+            merged.items[index].protein = merged.items[index].protein.rounded()
+            merged.items[index].carbs = merged.items[index].carbs.rounded()
+            merged.items[index].fat = merged.items[index].fat.rounded()
+            let item = edited.items[index]
+            guard let original = baseline.first(where: { $0.id == item.id }) else {
+                merged.items[index] = item; continue
+            }
+            if item.calories != original.calories { merged.items[index].calories = item.calories }
+            if item.protein != original.protein { merged.items[index].protein = item.protein }
+            if item.carbs != original.carbs { merged.items[index].carbs = item.carbs }
+            if item.fat != original.fat { merged.items[index].fat = item.fat }
+        }
+        guard merged.valid else { throw FoodAnalysisError.invalidResponse }
+        return merged
+    }
+    static func nextCorrectionBaseline(_ baseline: [EstimatedFoodItem], edited: [EstimatedFoodItem], refreshed: [EstimatedFoodItem]) -> [EstimatedFoodItem] {
+        baseline.map { original in
+            guard let edit = edited.first(where: { $0.id == original.id }), let fresh = refreshed.first(where: { $0.id == original.id }) else { return original }
+            var next = original
+            if edit.name == original.name { next.name = fresh.name }
+            if edit.grams == original.grams { next.grams = fresh.grams }
+            if edit.calories == original.calories { next.calories = fresh.calories }
+            if edit.protein == original.protein { next.protein = fresh.protein }
+            if edit.carbs == original.carbs { next.carbs = fresh.carbs }
+            if edit.fat == original.fat { next.fat = fresh.fat }
+            next.confidence = fresh.confidence; next.uncertaintyNotes = fresh.uncertaintyNotes
+            return next
+        }
+    }
     /// A nutrition response must respect removals, additions, identities and weighed portions.
     static func merge(_ result: FoodEstimate, reviewed: FoodEstimate) throws -> FoodEstimate {
         guard result.valid, reviewed.valid, result.items.count == reviewed.items.count else { throw FoodAnalysisError.invalidResponse }

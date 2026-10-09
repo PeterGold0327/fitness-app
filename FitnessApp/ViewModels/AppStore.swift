@@ -3,6 +3,7 @@ import SwiftData
 import Combine
 
 @MainActor final class AppStore: ObservableObject {
+    let library: PersonalLibrary
     let context: ModelContext
     private let clock: () -> Date
     var currentDate: Date { clock() }
@@ -22,7 +23,8 @@ import Combine
     @Published var errorMessage: String?
     let foodAnalysisSettings: FoodAnalysisSettings
 
-    init(context: ModelContext, now: @escaping () -> Date = Date.init, foodAnalysisSettings: FoodAnalysisSettings? = nil) {
+    init(context: ModelContext, now: @escaping () -> Date = Date.init, foodAnalysisSettings: FoodAnalysisSettings? = nil, library: PersonalLibrary? = nil) {
+        self.library = library ?? PersonalLibrary()
         self.context = context
         self.foodAnalysisSettings = foodAnalysisSettings ?? FoodAnalysisSettings()
         self.clock = now
@@ -190,7 +192,15 @@ import Combine
             exercise.position = position
         }
         session.exercises = exercises
-        return save()
+        let success = save()
+        if success, library.state.manualActivities.contains(where: { $0.workoutID == session.id }) {
+            library.update { state in
+                for index in state.manualActivities.indices where state.manualActivities[index].workoutID == session.id {
+                    state.manualActivities[index].date = date
+                }
+            }
+        }
+        return success
     }
     @discardableResult func logOption(_ option: MealOption, breakfast: Bool = false) -> Bool {
         reload()
@@ -231,8 +241,20 @@ import Combine
         if !badminton.contains(where: { Calendar.current.isDate($0.day, inSameDayAs: day) }) { context.insert(BadmintonEntry(day: day)) }
         return save()
     }
-    func deleteWorkout(_ workout: WorkoutSession) { context.delete(workout); save() }
-    func deleteBadminton(_ entry: BadmintonEntry) { context.delete(entry); save() }
+    func deleteWorkout(_ workout: WorkoutSession) {
+        let id = workout.id
+        context.delete(workout)
+        if save(), library.state.manualActivities.contains(where: { $0.workoutID == id }) {
+            library.update { $0.manualActivities.removeAll { $0.workoutID == id } }
+        }
+    }
+    func deleteBadminton(_ entry: BadmintonEntry) {
+        let date = entry.day
+        context.delete(entry)
+        if save(), library.state.manualActivities.contains(where: { $0.badminton && Calendar.current.isDate($0.date, inSameDayAs: date) }) {
+            library.update { $0.manualActivities.removeAll { $0.badminton && Calendar.current.isDate($0.date, inSameDayAs: date) } }
+        }
+    }
     func deleteWeight(_ entry: WeightEntry) { context.delete(entry); save() }
     @discardableResult func addInventory(_ name: String) -> Bool {
         let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -267,7 +289,7 @@ import Combine
     func exerciseAdvice(name: String) -> String {
         // Multiple load rows in one session are one performance observation, not separate sessions.
         let entries = workouts.filter { $0.date <= currentDate }.compactMap { session -> ExercisePerformance? in
-            let rows = session.exercises.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+            let rows = session.exercises.filter { TrainingCoach.canonical($0.name) == TrainingCoach.canonical(name) }
             guard !rows.isEmpty else { return nil }
             let completed = rows.allSatisfy { $0.reps >= $0.targetReps && $0.sets >= $0.targetSets && $0.sets > 0 }
             return ExercisePerformance(date: session.date, weight: rows.map(\.weightKG).max() ?? 0,
@@ -279,13 +301,13 @@ import Combine
         return FitnessLogic.progression(entries)
     }
     func exerciseProgress(name: String) -> String {
-        let sessions = workouts.filter { $0.date <= currentDate && $0.exercises.contains { $0.name.caseInsensitiveCompare(name) == .orderedSame } }
+        let sessions = workouts.filter { $0.date <= currentDate && $0.exercises.contains { TrainingCoach.canonical($0.name) == TrainingCoach.canonical(name) } }
         guard let latest = sessions.first else { return L10n.text("No sessions logged.") }
-        let rows = latest.exercises.sorted { $0.position < $1.position }.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        let rows = latest.exercises.sorted { $0.position < $1.position }.filter { TrainingCoach.canonical($0.name) == TrainingCoach.canonical(name) }
         let details = rows.map { L10n.text("%@ · %@ × %@", String(describing: weightText($0.weightKG)), String(describing: $0.sets), String(describing: $0.reps)) }.joined(separator: "; ")
         guard sessions.count > 1 else { return L10n.text("Latest: %@. First session is your baseline.", String(describing: details)) }
         func volume(_ session: WorkoutSession) -> Double {
-            session.exercises.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }.reduce(0) { $0 + $1.weightKG * Double($1.sets) * Double($1.reps) }
+            session.exercises.filter { TrainingCoach.canonical($0.name) == TrainingCoach.canonical(name) }.reduce(0) { $0 + $1.weightKG * Double($1.sets) * Double($1.reps) }
         }
         let previous = volume(sessions[1]), latestVolume = volume(latest)
         let change = previous > 0 ? L10n.text("%@ volume vs previous session", String(format: "%+.0f%%", locale: Locale.current, (latestVolume - previous) / previous * 100)) : L10n.text("Previous loaded volume unavailable")
@@ -294,7 +316,7 @@ import Combine
     var recentExerciseNames: [String] {
         let names = workouts.filter { $0.date >= startOfRecentDays(7) && $0.date <= currentDate }.flatMap { $0.exercises.map(\.name) }
         var byName: [String: String] = [:]
-        for name in names { byName[name.lowercased()] = name }
+        for name in names where byName[TrainingCoach.canonical(name)] == nil { byName[TrainingCoach.canonical(name)] = name }
         return byName.values.sorted()
     }
     var weeklyVolumeAdvice: String {

@@ -29,6 +29,12 @@ struct GrowthTimelineView: View {
                 Button(L10n.text("Export Archive")) { showExport = true }
             }
             if period != .day {
+                Section {
+                    SummaryCard(title: L10n.text("Period overview"), symbol: "sparkles") {
+                        Text(L10n.text("%@ logged nutrition days · %@ strength sessions · %@ badminton days", String(summary.nutritionDays), String(summary.gymSessions), String(summary.badmintonDays)))
+                        if let protein = summary.averageProtein { Text(L10n.text("Average recorded protein: %@ g. Missing days are excluded.", protein.wholeText)).font(.caption).foregroundStyle(.secondary) }
+                    }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                }
                 TimelineSummarySection(summary: summary)
                 if period == .month || period == .year {
                     let previousDate = calendar.date(byAdding: period.component, value: -1, to: interval.start)!
@@ -69,7 +75,7 @@ struct GrowthTimelineView: View {
                     }
                 }
             }
-        }.navigationTitle(L10n.text("Growth Timeline"))
+        }.calmList().navigationTitle(L10n.text("Growth Timeline"))
             .sheet(isPresented: $showExport) { TimelineExportSheet(selectedDate: selectedDate, period: period).storeErrorBanner() }
     }
     private func move(_ amount: Int) {

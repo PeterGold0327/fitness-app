@@ -3,27 +3,66 @@ import SwiftUI
 struct TrainingView: View {
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var health: HealthService
+    @EnvironmentObject private var library: PersonalLibrary
     @Binding var sheet: AppSheet?
     var body: some View {
         List {
-            Section {
+            Section(L10n.text("Today's activity")) {
+                let today = health.workouts.filter { Calendar.current.isDate($0.date, inSameDayAs: store.currentDate) }
+                ForEach(today) { workout in
+                    ActivityCard(workout: workout).listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                    if workout.isGym {
+                        ForEach(store.workouts.filter { Calendar.current.isDate($0.date, inSameDayAs: workout.date) }) { session in
+                            NavigationLink(L10n.text("View gym sets: %@", session.name)) { GymSessionDetail(session: session, sheet: $sheet) }
+                        }
+                    }
+                }
+                ForEach(library.state.manualActivities.filter { record in
+                    Calendar.current.isDate(record.date, inSameDayAs: store.currentDate) &&
+                    (record.badminton ? store.badminton.contains { Calendar.current.isDate($0.day, inSameDayAs: record.date) } : store.workouts.contains { $0.id == record.workoutID }) &&
+                    !today.contains { record.badminton ? $0.isBadminton : $0.isGym }
+                }) { activity in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(activity.badminton ? L10n.text("Badminton") : L10n.text("Strength training")).font(.headline)
+                        Text(L10n.text("%@ min", activity.minutes.wholeText))
+                        if let energy = activity.activeCalories { Text(L10n.text("%@ active kcal", energy.wholeText)) }
+                        Text(L10n.text("Manual entry")).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if today.isEmpty { Text(L10n.text("No readable Health workout today. Manual logging is available below.")).foregroundStyle(.secondary) }
+                ForEach(store.workouts.filter { Calendar.current.isDate($0.date, inSameDayAs: store.currentDate) }) { session in
+                    if !today.contains(where: \.isGym) {
+                        NavigationLink { GymSessionDetail(session: session, sheet: $sheet) } label: {
+                            Label(L10n.text("%@ · %@ exercises", session.name, String(Set(session.exercises.map { TrainingCoach.canonical($0.name) }).count)), systemImage: "dumbbell")
+                        }
+                    }
+                }
+            }
+            Section(L10n.text("Start training")) {
+                ForEach(library.state.workouts) { template in
+                    Button(L10n.text(template.id.title)) {
+                        library.plan(template.id, date: store.currentDate); sheet = .template(template.id)
+                    }.accessibilityIdentifier("training.template.\(template.id.rawValue)")
+                }
+                NavigationLink(L10n.text("Edit workout templates")) { WorkoutTemplatesEditor() }
                 Button(L10n.text("Log gym workout")) { sheet = .workout(nil) }
                 Button(L10n.text("Log badminton / add upcoming date")) { sheet = .badminton }
-                Text(L10n.text("You own your plan. Suggestions never change it automatically.")).font(.caption).foregroundStyle(.secondary)
+                if let error = library.error { Text(error).foregroundStyle(.red) }
             }
-            suggestionsSection
             gymLogSection
             badmintonSection
             healthWorkoutsSection
-        }.navigationTitle(L10n.text("Training"))
+            suggestionsSection
+        }.calmList().navigationTitle(L10n.text("Training"))
     }
 
     private var healthWorkoutsSection: some View {
-        Section(L10n.text("Apple Health workouts · last 7 days")) {
+        Section(L10n.text("Apple Health workouts · last 14 days")) {
             if health.workouts.isEmpty { Text(L10n.text("No readable workouts. Connect Health in Settings.")).foregroundStyle(.secondary) }
             ForEach(health.workouts) { workout in
                 VStack(alignment: .leading) {
                     Text(L10n.text("%@ · %@ min", String(describing: workout.label), String(describing: (workout.minutes).wholeText)))
+                    if let energy = workout.activeCalories { Text(L10n.text("%@ active kcal", energy.wholeText)).font(.caption) }
                     Text(workout.date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -180,16 +219,35 @@ struct WorkoutEditor: View {
 struct BadmintonEditor: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var library: PersonalLibrary
+    @State private var minutes = 0.0
+    @State private var energy = 0.0
     @State private var date = Date()
     var body: some View {
         NavigationStack {
             Form {
                 DatePicker(L10n.text("Badminton date"), selection: $date, displayedComponents: .date)
+                if date <= store.currentDate {
+                    NumberField(title: L10n.text("Duration in minutes (optional)"), value: $minutes)
+                    NumberField(title: L10n.text("Active calories (optional)"), value: $energy)
+                    Text(L10n.text("Only enter duration or energy when Health has no readable workout. Leave zero if unknown.")).font(.caption)
+                }
                 Text(L10n.text("One entry per day. Upcoming dates help flag heavy leg sessions nearby; only completed dates count toward weekly summaries.")).font(.caption)
             }.navigationTitle(L10n.text("Badminton"))
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button(L10n.text("Cancel")) { dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) { Button(L10n.text("Save")) { if store.logBadminton(date: date) { dismiss() } } }
+                    ToolbarItem(placement: .confirmationAction) { Button(L10n.text("Save")) {
+                        guard minutes.isFinite, energy.isFinite, (0...600).contains(minutes), (0...10000).contains(energy), energy == 0 || minutes >= 1 else { return }
+                        if store.logBadminton(date: date) {
+                            if date <= store.currentDate, minutes >= 1 {
+                                if !library.update({ state in
+                                    state.manualActivities.removeAll { $0.badminton && Calendar.current.isDate($0.date, inSameDayAs: date) }
+                                    state.manualActivities.append(ManualActivityRecord(date: date, badminton: true, minutes: minutes, activeCalories: energy > 0 ? energy : nil))
+                                }) { return }
+                            }
+                            dismiss()
+                        }
+                    } }
                 }
         }
     }

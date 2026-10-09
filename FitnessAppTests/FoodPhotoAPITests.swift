@@ -615,4 +615,29 @@ final class FoodPhotoAPITests: XCTestCase {
         }
     }
 
+    func testReanalysisRetainsManualNamesPortionsNutritionAndMissingFoodCorrections() throws {
+        let original = try ResponsesFoodPhotoAnalyzer.parse(envelope())
+        var edited = original
+        edited.items[0].name = "豆腐"
+        edited.items[0].resize(to: 123)
+        edited.items[0].protein = 11.5
+        edited.items.removeLast()
+        edited.items.append(EstimatedFoodItem(name: "白菜", grams: 100, calories: 35, protein: 2, carbs: 7, fat: 0, confidence: 0, uncertaintyNotes: ""))
+        var guessed = edited
+        guessed.items[0].calories = 900; guessed.items[0].protein = 90
+        guessed.items[1].calories = 700; guessed.items[1].protein = 70
+        let result = try FoodReview.preserveCorrections(guessed, baseline: original.items, edited: edited)
+        XCTAssertEqual(result.items.map(\.name), ["豆腐", "白菜"])
+        XCTAssertEqual(result.items[0].grams, 123)
+        XCTAssertEqual(result.items[0].calories, edited.items[0].calories)
+        XCTAssertEqual(result.items[0].protein, 11.5)
+        XCTAssertEqual(result.items[1], edited.items[1])
+        XCTAssertEqual(result.calories, edited.calories)
+        XCTAssertEqual(result.protein, edited.protein)
+        let baseline = FoodReview.nextCorrectionBaseline(original.items, edited: edited.items, refreshed: result.items)
+        XCTAssertNotEqual(baseline.first?.protein, result.items.first?.protein, "Manual corrections remain marked for another analysis")
+        guessed.items.append(original.items[1])
+        XCTAssertThrowsError(try FoodReview.preserveCorrections(guessed, baseline: original.items, edited: edited))
+    }
+
 }
