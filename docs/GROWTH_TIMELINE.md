@@ -1,6 +1,8 @@
 # Growth Timeline / 成长时间线
 
-Progress now opens a four-item navigation page: **Overview**, **Growth Timeline**, **Milestones**, and **Progress Photos**. The five existing tabs remain. Overview retains the original charts, weight history, gym advice and saved weekly summaries.
+The real Progress-tab view is `ProgressViewScreen` in `FitnessApp/Views/ProgressView.swift`, selected by `RootView.tabs`. Its first List section is **Growth Timeline / 成长时间线**, with five direct links: **Growth Timeline**, **Milestones**, **Progress Photos**, **On This Day**, and **Export Archive**. The original weight trends, nutrition adherence, gym progress, weekly summary, saved summaries and weight history appear below those links in the same Progress screen. The five existing tabs remain.
+
+The links push `GrowthTimelineView`, `MilestonesView`, `ProgressPhotosView`, `OnThisDayView` and `TimelineExportView` onto the existing Progress NavigationStack. On This Day uses the real anniversary aggregation/comparison flow, including empty-data handling. Export reuses the real Markdown/photo ZIP exporter, now with an editable anchor date. Its pushed form uses the parent stack; only modal export presentation creates a separate NavigationStack.
 
 ## Source of truth and privacy
 
@@ -88,6 +90,12 @@ with zipfile.ZipFile('/tmp/growth-timeline-validation.zip') as archive:
 PY
 ```
 
-Four added SwiftData tests cover canonical record/photo reuse, milestone persistence/deduplication/deletion reconciliation, file-backed progress-photo/manual-milestone reopening, and addition of archive models to an existing file-backed store. Two added UI tests cover Progress navigation, manual milestone creation, Chinese Timeline and export controls. These Apple-platform tests were **not run on Linux**; Swift syntax parsing is not Apple-SDK compilation.
+Four added SwiftData tests cover canonical record/photo reuse, milestone persistence/deduplication/deletion reconciliation, file-backed progress-photo/manual-milestone reopening, and addition of archive models to an existing file-backed store. Three archive UI tests cover all five first-screen Progress links and their real destinations, manual milestone creation, Chinese Timeline/export controls, and preservation of the original Progress sections below the archive links. These Apple-platform tests were **not run on Linux**; Swift syntax parsing is not Apple-SDK compilation.
 
 Before device use, run the app-hosted and UI suites with Xcode 16+ as documented in README. On an existing installation verify data-preserving migration, milestone correction/deletion and locale changes, local progress-photo reopening/deletion, no-photo/missing-period views, photo comparisons, and a real Files export that opens with all images. Check long histories, larger text sizes and the Chinese labels on narrow iPhones. None of those simulator/device behaviors are claimed as executed here.
+
+## App-target membership and installing the navigation fix
+
+Run `python3 scripts/check-ios-target.py` to resolve the checked-in project’s PBXNativeTarget → PBXSourcesBuildPhase → PBXBuildFile → PBXFileReference chain. It verifies that every Swift file under FitnessApp (including Progress, Root, Timeline, archive views, store and domain services) is in the **LeanLog application target** and that the shared LeanLog scheme builds/launches that target. `python3 scripts/test-ios-target.py` runs three regression checks, including rejecting a timeline file that has only a file reference and rejecting a scheme that launches the test target. These checks inspect the actual checked-in project; they do not substitute for Xcode compilation.
+
+To see the change on an iPhone, fetch current main, open **FitnessApp.xcodeproj**, select **LeanLog** and the phone, then build/run the app. A Git push does not update an already installed binary. Confirm the five archive links are visible immediately at the top of Progress in English and Simplified Chinese, open each destination, return using Back, and verify the original charts/logs remain below the links. The navigation UI tests can also run on a connected iPhone using its device destination, subject to signing. The Linux environment cannot install/run an iPhone build, so physical-device execution remains unverified here.

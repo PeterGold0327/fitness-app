@@ -17,8 +17,8 @@ The cloud machine is Linux. **The iOS app has not been compiled or launched with
 - **Home:** daily nutrition, remaining targets, breakfast state, quick logging, activity, weight averages and sleep.
 - **Nutrition:** dated food log, add/edit/delete meals, camera/library attachment, two-step food-photo detection/review and nutrition estimation via OpenAI, or editable demo estimates, and three meal suggestions with specific grams and estimated macros.
 - **Training:** date/name and multiple exercise rows per gym session, load/sets/reps/target reps/RPE/notes, edit/delete sessions, simple weekly progression, nearby badminton warnings and a date-only badminton log (including upcoming dates).
-- **Progress:** Overview retains the 28-day weight graph and 7-day moving averages, 2/4-week comparisons, nutrition adherence, live last-seven-day summary and saved summary snapshots.
-- **Growth Timeline / 成长时间线:** day/week/month/year history from existing logs, period summaries and previous-month comparison, automatic/manual milestones, private front/side/back progress photos and comparison pairs, On This Day, and Markdown + photo ZIP export to Files. Find Overview, Timeline, Milestones and Photos inside Progress. See [archive design and validation](docs/GROWTH_TIMELINE.md).
+- **Progress:** 28-day weight graph and 7-day moving averages, 2/4-week comparisons, nutrition adherence, live last-seven-day summary and saved summary snapshots.
+- **Growth Timeline / 成长时间线:** day/week/month/year history from existing logs, period summaries and previous-month comparison, automatic/manual milestones, private front/side/back progress photos and comparison pairs, On This Day, and Markdown + photo ZIP export to Files. The first Growth Timeline section in Progress links directly to Timeline, Milestones, Photos, On This Day and Export Archive; existing charts and history remain below it. See [archive design and validation](docs/GROWTH_TIMELINE.md).
 - **Settings:** profile and nutrition targets, breakfast portions, kg/lb display, inventory, Health access and food-photo API configuration.
 - **HealthKit:** read steps, active energy, latest heart rate today, recent workouts, weight and sleep; manual logging remains usable without Health access. Watch data is read via HealthKit, not a separate Watch app.
 
@@ -76,7 +76,7 @@ xcodebuild -project FitnessApp.xcodeproj -scheme LeanLog \
   -derivedDataPath DerivedData test CODE_SIGNING_ALLOWED=NO
 ```
 
-**Quality pass:** 103 portable XCTest cases pass on Linux. Xcode also contains 23 SwiftData tests, 2 configuration tests and 7 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
+**Quality pass:** 103 portable XCTest cases pass on Linux. Xcode also contains 23 SwiftData tests, 2 configuration tests and 8 UI tests, all still unrun here. Persistence tests cover inverses/cascades, replacement of children, rollback, daily rollover, repeated imports, completion targets, coverage, exercise ordering and file-backed reopening. UI tests cover all five tabs, sheets/cancellation, food save/invalid-input handling and settings navigation. See [the full review](docs/MVP_REVIEW.md) for feature-by-feature coverage, fixes and known limits. These Apple-platform tests cannot execute on Linux.
 
 Only if files are added/removed, regenerate project references using `python3 scripts/generate_project.py` (this replaces the generated project and scheme; preserve any custom signing/project settings first). Otherwise open the checked-in project directly.
 

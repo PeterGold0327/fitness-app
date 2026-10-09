@@ -2,31 +2,6 @@ import SwiftUI
 import Charts
 import UniformTypeIdentifiers
 
-struct ProgressViewScreen: View {
-    @Binding var sheet: AppSheet?
-    var body: some View {
-        List {
-            Section(L10n.text("Progress")) {
-                NavigationLink { ProgressOverviewView(sheet: $sheet) } label: {
-                    Label(L10n.text("Overview"), systemImage: "chart.xyaxis.line")
-                }
-                NavigationLink { GrowthTimelineView() } label: {
-                    Label(L10n.text("Growth Timeline"), systemImage: "calendar")
-                }
-                NavigationLink { MilestonesView() } label: {
-                    Label(L10n.text("Milestones"), systemImage: "flag")
-                }
-                NavigationLink { ProgressPhotosView() } label: {
-                    Label(L10n.text("Progress Photos"), systemImage: "photo.on.rectangle")
-                }
-            }
-            Section {
-                Text(L10n.text("Your private history, assembled from existing logs. No duplicate meals, workouts, weights or sleep records.")).font(.callout).foregroundStyle(.secondary)
-            }
-        }.navigationTitle(L10n.text("Progress"))
-    }
-}
-
 struct GrowthTimelineView: View {
     @EnvironmentObject private var store: AppStore
     @State private var period = TimelinePeriod.day
@@ -95,10 +70,38 @@ struct GrowthTimelineView: View {
                 }
             }
         }.navigationTitle(L10n.text("Growth Timeline"))
-            .sheet(isPresented: $showExport) { TimelineExportView(selectedDate: selectedDate, period: period).storeErrorBanner() }
+            .sheet(isPresented: $showExport) { TimelineExportSheet(selectedDate: selectedDate, period: period).storeErrorBanner() }
     }
     private func move(_ amount: Int) {
         if let date = calendar.date(byAdding: period.component, value: amount, to: interval.start) { selectedDate = min(date, store.currentDate) }
+    }
+}
+
+struct OnThisDayView: View {
+    @EnvironmentObject private var store: AppStore
+    @State private var selectedDate = Date()
+    var body: some View {
+        let history = store.makeTimelineHistory(includePhotoData: false)
+        let historical = GrowthTimeline.onThisDay(history: history, date: selectedDate, calendar: .current)
+        let current = GrowthTimeline.day(selectedDate, history: history, calendar: .current, asOf: store.currentDate)
+        List {
+            Section {
+                DatePicker(L10n.text("Date"), selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+            }
+            Section(L10n.text("Historical comparison")) {
+                if historical.isEmpty {
+                    Text(L10n.text("No earlier anniversary records yet.")).foregroundStyle(.secondary)
+                }
+                ForEach(historical) { day in
+                    NavigationLink { TimelineAnniversaryView(historical: day, current: current) } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(day.date.formatted(date: .abbreviated, time: .omitted)).font(.headline)
+                            Text(day.summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }.navigationTitle(L10n.text("On This Day"))
     }
 }
 
@@ -274,8 +277,7 @@ struct TimelineArchiveDocument: FileDocument {
 
 struct TimelineExportView: View {
     @EnvironmentObject private var store: AppStore
-    @Environment(\.dismiss) private var dismiss
-    var selectedDate: Date
+    @State var selectedDate: Date
     @State var period: TimelinePeriod
     @State private var entireHistory = false
     @State private var includePhotos = true
@@ -285,28 +287,25 @@ struct TimelineExportView: View {
     @State private var showFileExporter = false
     @State private var error: String?
     var body: some View {
-        NavigationStack {
-            Form {
-                Toggle(L10n.text("Entire history"), isOn: $entireHistory)
-                if !entireHistory {
-                    Picker(L10n.text("Export period"), selection: $period) {
-                        ForEach(TimelinePeriod.allCases, id: \.self) { Text($0.label).tag($0) }
-                    }
-                    Text(selectedDate.formatted(date: .abbreviated, time: .omitted))
+        Form {
+            Toggle(L10n.text("Entire history"), isOn: $entireHistory)
+            if !entireHistory {
+                Picker(L10n.text("Export period"), selection: $period) {
+                    ForEach(TimelinePeriod.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
-                Toggle(L10n.text("Include photos"), isOn: $includePhotos)
-                Text(L10n.text("Save a ZIP to Files containing archive.md and a photos folder. Photos stay private unless you move or share the exported archive yourself.")).font(.caption)
-                Button(L10n.text("Export Archive")) { prepare() }.disabled(preparing)
-                if preparing { ProgressView(L10n.text("Preparing archive…")) }
-                if let error { Text(error).foregroundStyle(.red) }
-            }.disabled(preparing).navigationTitle(L10n.text("Export Archive"))
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L10n.text("Close")) { exportTask?.cancel(); dismiss() } } }
-                .fileExporter(isPresented: $showFileExporter, document: document, contentType: .zip, defaultFilename: "growth-timeline-" + GrowthTimeline.dateKey(selectedDate, calendar: .current)) { result in
-                    if case .failure(let failure) = result { error = L10n.text("Export failed: %@", failure.localizedDescription) }
-                    document = nil
-                }
-                .onDisappear { exportTask?.cancel() }
-        }
+                DatePicker(L10n.text("Date"), selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+            }
+            Toggle(L10n.text("Include photos"), isOn: $includePhotos)
+            Text(L10n.text("Save a ZIP to Files containing archive.md and a photos folder. Photos stay private unless you move or share the exported archive yourself.")).font(.caption)
+            Button(L10n.text("Export Archive")) { prepare() }.disabled(preparing)
+            if preparing { ProgressView(L10n.text("Preparing archive…")) }
+            if let error { Text(error).foregroundStyle(.red) }
+        }.disabled(preparing).navigationTitle(L10n.text("Export Archive"))
+            .fileExporter(isPresented: $showFileExporter, document: document, contentType: .zip, defaultFilename: "growth-timeline-" + GrowthTimeline.dateKey(selectedDate, calendar: .current)) { result in
+                if case .failure(let failure) = result { error = L10n.text("Export failed: %@", failure.localizedDescription) }
+                document = nil
+            }
+            .onDisappear { exportTask?.cancel() }
     }
     private func prepare() {
         preparing = true; error = nil
@@ -328,6 +327,23 @@ struct TimelineExportView: View {
                 document = TimelineArchiveDocument(data: data); showFileExporter = true
             } catch is CancellationError { return }
             catch { self.error = L10n.text("Export failed: %@", error.localizedDescription) }
+        }
+    }
+}
+
+// Modal presentation owns a NavigationStack; a pushed export form uses Progress's stack.
+private struct TimelineExportSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    var selectedDate: Date
+    var period: TimelinePeriod
+    var body: some View {
+        NavigationStack {
+            TimelineExportView(selectedDate: selectedDate, period: period)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(L10n.text("Close")) { dismiss() }
+                    }
+                }
         }
     }
 }

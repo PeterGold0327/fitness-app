@@ -120,11 +120,28 @@ import XCTest
     func testProgressArchiveNavigationAndManualMilestone() {
         launchFreshApp()
         app.tabBars.buttons["Progress"].tap()
-        for (link, title) in [("Overview", "Overview"), ("Growth Timeline", "Growth Timeline"),
-                               ("Milestones", "Milestones"), ("Progress Photos", "Progress Photos")] {
-            tap(link)
+        let routes = [("progress.timeline", "Growth Timeline"), ("progress.milestones", "Milestones"),
+                      ("progress.photos", "Progress Photos"), ("progress.onThisDay", "On This Day"),
+                      ("progress.export", "Export Archive")]
+        // Check visibility before scrolling: these must be first-screen entry points.
+        for (identifier, _) in routes {
+            XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 3))
+            XCTAssertTrue(app.buttons[identifier].isHittable, identifier)
+        }
+        attachScreenshot("Progress archive entry points")
+        for (identifier, title) in routes {
+            app.buttons[identifier].tap()
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 3))
+            if identifier == "progress.onThisDay" {
+                XCTAssertTrue(app.staticTexts["No earlier anniversary records yet."].exists)
+            }
+            if identifier == "progress.export" {
+                XCTAssertTrue(app.switches["Entire history"].exists)
+                XCTAssertTrue(app.switches["Include photos"].exists)
+                XCTAssertTrue(app.buttons["Export Archive"].exists)
+            }
             app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 3))
         }
         tap("Milestones"); tap("Add milestone")
         enter("First tournament", in: "Milestone title")
@@ -145,7 +162,12 @@ import XCTest
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["进展"].waitForExistence(timeout: 10))
         app.tabBars.buttons["进展"].tap()
-        for label in ["概览", "成长时间线", "里程碑", "成长照片"] { XCTAssertTrue(app.buttons[label].firstMatch.exists) }
+        for (identifier, label) in [("progress.timeline", "成长时间线"), ("progress.milestones", "里程碑"),
+                                     ("progress.photos", "成长照片"), ("progress.onThisDay", "那年今日"),
+                                     ("progress.export", "导出成长档案")] {
+            XCTAssertTrue(app.buttons[identifier].isHittable)
+            XCTAssertTrue(app.buttons[identifier].label.contains(label))
+        }
         tap("成长时间线")
         XCTAssertTrue(app.navigationBars["成长时间线"].waitForExistence(timeout: 3))
         tap("导出成长档案")
@@ -153,6 +175,21 @@ import XCTest
         XCTAssertTrue(app.switches["全部历史"].exists)
         app.navigationBars.buttons["关闭"].tap()
     }
+    func testOriginalProgressSectionsRemainBelowArchiveLinks() {
+        launchFreshApp()
+        app.tabBars.buttons["Progress"].tap()
+        XCTAssertTrue(app.buttons["progress.timeline"].isHittable)
+        for title in ["Body weight · last 4 weeks", "Nutrition adherence · last 7 days",
+                      "Gym progress", "Weekly summary", "Weight history"] {
+            let header = app.staticTexts[title].firstMatch
+            for _ in 0..<10 {
+                if header.exists && header.isHittable { break }
+                app.swipeUp()
+            }
+            XCTAssertTrue(header.isHittable, title)
+        }
+    }
+
     private func attachScreenshot(_ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
