@@ -500,3 +500,13 @@
 "%@ · %@ g · %@ kcal · P %@ / C %@ / F %@ g" = "%@ · %@ g · %@ kcal · P %@ / C %@ / F %@ g";
 "%@ kg × %@ reps × %@ sets · RPE %@" = "%@ kg × %@ reps × %@ sets · RPE %@";
 "Current photos" = "Current photos";
+
+"Check food names, positive grams and nonnegative nutrition values. Zero-calorie drinks can be logged." = "Check food names, positive grams and nonnegative nutrition values. Zero-calorie drinks can be logged.";
+"%@ — %@ g" = "%@ — %@ g";
+"%@ kcal · Protein %@ g · Carbs %@ g · Fat %@ g" = "%@ kcal · Protein %@ g · Carbs %@ g · Fat %@ g";
+"Edit any food or nutrition value. Changing grams updates nutrition and totals immediately." = "Edit any food or nutrition value. Changing grams updates nutrition and totals immediately.";
+"Meal context (optional)" = "Meal context (optional)";
+"Analyze photo" = "Analyze photo";
+"Analyze sends this photo to %@ and returns editable food estimates." = "Analyze sends this photo to %@ and returns editable food estimates.";
+
+"AI photo estimate" = "AI photo estimate";

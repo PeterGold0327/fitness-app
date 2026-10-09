@@ -500,3 +500,13 @@
 "%@ · %@ g · %@ kcal · P %@ / C %@ / F %@ g" = "%@ · %@ 克 · %@ 千卡 · 蛋白质 %@ / 碳水 %@ / 脂肪 %@ 克";
 "%@ kg × %@ reps × %@ sets · RPE %@" = "%@ 千克 × %@ 次 × %@ 组 · RPE %@";
 "Current photos" = "当前照片";
+
+"Check food names, positive grams and nonnegative nutrition values. Zero-calorie drinks can be logged." = "请检查食物名称、正数克重和非负营养值。零热量饮品也可以记录。";
+"%@ — %@ g" = "%@ — %@ 克";
+"%@ kcal · Protein %@ g · Carbs %@ g · Fat %@ g" = "%@ 千卡 · 蛋白质 %@ 克 · 碳水 %@ 克 · 脂肪 %@ 克";
+"Edit any food or nutrition value. Changing grams updates nutrition and totals immediately." = "可修改食物或营养值。修改克重会立即更新营养值和总量。";
+"Meal context (optional)" = "餐食说明（可选）";
+"Analyze photo" = "分析照片";
+"Analyze sends this photo to %@ and returns editable food estimates." = "分析会将此照片发送至 %@，并返回可编辑的食物估算。";
+
+"AI photo estimate" = "AI 照片估算";
