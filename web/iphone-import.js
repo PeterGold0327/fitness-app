@@ -1,6 +1,6 @@
 /* One-time migration helper for the existing iPhone Growth Timeline export.
    Import the archive.md file from the ZIP exported by the iPhone app.
-   The importer only ADDS missing records. It never deletes Windows records. */
+   The importer only ADDS or enriches missing records. It never deletes Windows records. */
 (function(){
   function num(s){const m=String(s||'').match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null;}
   function uniq(list,id){const out=[],seen=new Set();for(const x of list){const k=id(x);if(!seen.has(k)){seen.add(k);out.push(x);}}return out;}
@@ -28,6 +28,24 @@
       return{weight:nums[0],reps:Math.round(nums[1]),sets:Math.round(nums[2]),rpe:Number(nums[3]||0)};
     }
     return null;
+  }
+
+  function parseFoodLine(line){
+    const text=String(line||'').replace(/^[-•]\s*/,'').trim();
+    if(!text||!text.includes('·'))return null;
+    const parts=text.split('·').map(x=>x.trim()).filter(Boolean);
+    if(parts.length<3)return null;
+    const name=parts[0],grams=num(parts[1]),calories=num(parts[2]);
+    if(!name||grams==null||calories==null)return null;
+    const macroText=parts.slice(3).join(' ');
+    let protein=0,carbs=0,fat=0;
+    let m=macroText.match(/P(?:rotein)?\s*([\d.]+)\s*\/\s*C(?:arbs?)?\s*([\d.]+)\s*\/\s*F(?:at)?\s*([\d.]+)/i);
+    if(m){protein=Number(m[1]);carbs=Number(m[2]);fat=Number(m[3]);}
+    else{
+      m=macroText.match(/蛋白质\s*([\d.]+)\s*\/\s*碳水(?:化合物)?\s*([\d.]+)\s*\/\s*脂肪\s*([\d.]+)/i);
+      if(m){protein=Number(m[1]);carbs=Number(m[2]);fat=Number(m[3]);}
+    }
+    return{name,grams,calories,protein,carbs,fat,source:'iphone-archive'};
   }
 
   function parseArchive(text){
@@ -60,8 +78,12 @@
           flushMeal();
           const title=line.slice(4).trim();
           const name=title.includes(':')?title.split(':').slice(1).join(':').trim():title;
-          meal={id:crypto.randomUUID(),date:day,name:name||'iPhone 饮食记录',calories:0,protein:0,carbs:0,fat:0,source:'iphone-archive'};
+          meal={id:crypto.randomUUID(),date:day,name:name||'iPhone 饮食记录',calories:0,protein:0,carbs:0,fat:0,items:[],source:'iphone-archive'};
           continue;
+        }
+        if(meal&&line.startsWith('- ')){
+          const food=parseFoodLine(line);
+          if(food){meal.items.push(food);continue;}
         }
         if(meal&&(line.includes('Calories:')||line.includes('热量:')||line.includes('热量：'))){
           const nums=[...line.matchAll(/-?\d+(?:\.\d+)?/g)].map(x=>Number(x[0]));
@@ -97,8 +119,21 @@
     return imported;
   }
 
+  function mealKey(x){return `${x.date}|${x.name}|${x.calories}|${x.protein}|${x.carbs}|${x.fat}`;}
+  function mergeMeals(current=[],incoming=[]){
+    const map=new Map(current.map(x=>[mealKey(x),x]));
+    for(const item of incoming){
+      const k=mealKey(item),existing=map.get(k);
+      if(!existing){map.set(k,item);continue;}
+      const oldItems=Array.isArray(existing.items)?existing.items:[];
+      const newItems=Array.isArray(item.items)?item.items:[];
+      if(!oldItems.length&&newItems.length)existing.items=newItems;
+    }
+    return [...map.values()];
+  }
+
   function mergeImported(data){
-    state.meals=uniq([...(state.meals||[]),...data.meals],x=>`${x.date}|${x.name}|${x.calories}|${x.protein}|${x.carbs}|${x.fat}`);
+    state.meals=mergeMeals(state.meals||[],data.meals);
     state.workouts=uniq([...(state.workouts||[]),...data.workouts],x=>`${x.date}|${x.split||x.name}|${(x.exercises||[]).map(e=>e.name).join(',')}`);
     state.badminton=uniq([...(state.badminton||[]),...data.badminton],x=>`${x.date}|${x.source||''}`);
     state.weights=uniq([...(state.weights||[]),...data.weights],x=>x.date);
@@ -108,10 +143,10 @@
 
   window.openIPhoneImport=function(){
     modal(`<h2>重新导入 iPhone 历史记录</h2>
-      <div class="surface-note">选择之前导出的 ZIP 里的 <strong>archive.md</strong>。新版导入器已经兼容中文健身格式（千克 / 次 / 组 / RPE）、羽毛球记录，并会把旧训练自动归到胸 / 肩 / 背 / 腿，方便后续读取上次动作表现。</div>
+      <div class="surface-note">选择之前导出的 ZIP 里的 <strong>archive.md</strong>。新版导入器会补齐每天的食物明细、中文健身格式和羽毛球记录，并把旧训练自动归到胸 / 肩 / 背 / 腿。</div>
       <div class="field"><label>选择 archive.md</label><input id="iphoneArchiveFile" type="file" accept=".md,text/markdown,text/plain"></div>
       <button type="button" class="primary" onclick="importIPhoneArchive()">导入并合并</button>
-      <div class="surface-note">重复导入会自动去重，不会覆盖你现在 Windows 上的新记录。</div>`);
+      <div class="surface-note">重复导入会自动去重；如果旧饮食记录缺少具体食物，这次会自动补上，不会覆盖你现在 Windows 的新记录。</div>`);
   };
 
   window.importIPhoneArchive=async function(){
@@ -121,7 +156,8 @@
       const data=parseArchive(await file.text());
       mergeImported(data);
       closeModal();
-      alert(`导入完成：饮食 ${data.meals.length}，健身 ${data.workouts.length}，羽毛球 ${data.badminton.length}，体重 ${data.weights.length}，睡眠 ${data.sleep.length}。重复记录已自动去重。`);
+      const foods=data.meals.reduce((s,m)=>s+(m.items?.length||0),0);
+      alert(`导入完成：饮食 ${data.meals.length}（食物明细 ${foods} 项），健身 ${data.workouts.length}，羽毛球 ${data.badminton.length}，体重 ${data.weights.length}，睡眠 ${data.sleep.length}。重复记录已自动去重。`);
     }catch(e){console.error(e);alert('导入失败：请确认选择的是 iPhone 成长档案里的 archive.md');}
   };
 
