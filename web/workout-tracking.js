@@ -1,4 +1,4 @@
-/* Strength workout entry upgrade: adds sets while preserving existing records. */
+/* Strength workout entry upgrade: editable exercise names + sets while preserving existing records. */
 (function () {
   function previousText(p) {
     if (!p) return '暂无上次记录';
@@ -13,8 +13,9 @@
       return `
         <section class="workout-exercise-card">
           <div class="workout-exercise-head">
-            <div>
-              <div class="exercise-name">${esc(name)}</div>
+            <div class="exercise-title-edit">
+              <label class="tiny">动作名称</label>
+              <input id="n${i}" class="exercise-name-input" value="${esc(name)}" placeholder="输入动作名称">
               <div class="previous">${previousText(p)}</div>
             </div>
             <span class="exercise-index">${String(i + 1).padStart(2, '0')}</span>
@@ -44,7 +45,7 @@
         <div>
           <div class="hero-kicker">STRENGTH WORKOUT</div>
           <h2>${split}训练</h2>
-          <p class="subtle">记录实际完成的重量、组数和每组次数。上次表现会自动带出。</p>
+          <p class="subtle">动作名称可以直接修改。保存后会记住你的名称，下次继续使用。</p>
         </div>
         <span class="pill">${state.templates[split].length} 个动作</span>
       </div>
@@ -61,12 +62,20 @@
   };
 
   window.saveWorkout = function saveWorkout(split) {
-    const exercises = state.templates[split].map((name, i) => {
+    const editedNames = state.templates[split].map((oldName, i) => {
+      const value = document.querySelector('#n' + i)?.value?.trim();
+      return value || oldName;
+    });
+
+    const exercises = editedNames.map((name, i) => {
       const weight = Math.max(0, Number(document.querySelector('#w' + i)?.value) || 0);
       const sets = Math.max(0, Math.round(Number(document.querySelector('#s' + i)?.value) || 0));
       const reps = document.querySelector('#r' + i)?.value.trim() || '';
       return { name, weight, sets, reps };
     }).filter(x => x.weight || x.reps || x.sets);
+
+    // Persist customized exercise names as this split's template for future sessions.
+    state.templates[split] = editedNames;
 
     state.workouts.push({
       id: crypto.randomUUID(),
