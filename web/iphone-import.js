@@ -4,6 +4,25 @@
 (function(){
   function num(s){const m=String(s||'').match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null;}
   function uniq(list,id){const out=[],seen=new Set();for(const x of list){const k=id(x);if(!seen.has(k)){seen.add(k);out.push(x);}}return out;}
+  function isGymSection(section){return /gym|健身|力量训练|训练记录|strength/i.test(section||'');}
+  function isBadmintonSection(section){return /badminton|羽毛球/i.test(section||'');}
+  function isNoneLogged(line){return /none logged|not logged|未记录|无记录|暂无/i.test(line||'');}
+
+  function parseExerciseLine(line){
+    const text=String(line||'').replace(/^[-•]\s*/,'').trim();
+    // English archive: 20.0 kg × 10 reps × 3 sets · RPE 8.0
+    let m=text.match(/([\d.]+)\s*kg\s*[×x]\s*(\d+)\s*reps?\s*[×x]\s*(\d+)\s*sets?(?:\s*·?\s*RPE\s*([\d.]+))?/i);
+    if(m)return{weight:Number(m[1]),reps:Number(m[2]),sets:Number(m[3]),rpe:Number(m[4]||0)};
+    // Chinese archive: 20.0 千克 × 10 次 × 3 组 · RPE 8.0
+    m=text.match(/([\d.]+)\s*(?:千克|公斤|kg)\s*[×x]\s*(\d+)\s*次\s*[×x]\s*(\d+)\s*组(?:\s*·?\s*RPE\s*([\d.]+))?/i);
+    if(m)return{weight:Number(m[1]),reps:Number(m[2]),sets:Number(m[3]),rpe:Number(m[4]||0)};
+    // Loose fallback for older exports that still contain weight/reps/sets in this order.
+    const nums=[...text.matchAll(/-?\d+(?:\.\d+)?/g)].map(x=>Number(x[0]));
+    if(nums.length>=3&&(text.includes('RPE')||/组|sets?/i.test(text))){
+      return{weight:nums[0],reps:Math.round(nums[1]),sets:Math.round(nums[2]),rpe:Number(nums[3]||0)};
+    }
+    return null;
+  }
 
   function parseArchive(text){
     const lines=text.replace(/\r/g,'').split('\n');
@@ -41,16 +60,28 @@
           continue;
         }
       }
-      if(section.includes('gym')||section.includes('健身')){
-        if(line.startsWith('### ')){flushWorkout();workout={id:crypto.randomUUID(),date:day,split:line.slice(4).trim()||'健身',name:line.slice(4).trim()||'健身',minutes:0,calories:0,exercises:[],source:'iphone-archive'};continue;}
-        if(workout&&line.startsWith('#### ')){exercise={name:line.slice(5).trim(),weight:0,reps:'',sets:0,rpe:0};workout.exercises.push(exercise);continue;}
+      if(isGymSection(section)){
+        if(line.startsWith('### ')){
+          flushWorkout();
+          const title=line.slice(4).trim()||'健身';
+          workout={id:crypto.randomUUID(),date:day,split:title,name:title,minutes:0,calories:0,exercises:[],source:'iphone-archive'};
+          continue;
+        }
+        if(workout&&line.startsWith('#### ')){
+          exercise={name:line.slice(5).trim(),weight:0,reps:'',sets:0,rpe:0};
+          workout.exercises.push(exercise);
+          continue;
+        }
         if(exercise&&line.startsWith('- ')){
-          const m=line.match(/([\d.]+)\s*kg\s*[×x]\s*(\d+)\s*reps\s*[×x]\s*(\d+)\s*sets(?:\s*·\s*RPE\s*([\d.]+))?/i);
-          if(m){exercise.weight=Number(m[1]);exercise.reps=m[2];exercise.sets=Number(m[3]);exercise.rpe=Number(m[4]||0);}continue;
+          const parsed=parseExerciseLine(line);
+          if(parsed){exercise.weight=parsed.weight;exercise.reps=String(parsed.reps);exercise.sets=parsed.sets;exercise.rpe=parsed.rpe;}
+          continue;
         }
       }
-      if(section.includes('badminton')||section.includes('羽毛球')){
-        if(/logged|已记录|有记录/i.test(line)&&!/none|未记录/i.test(line))imported.badminton.push({id:crypto.randomUUID(),date:day,minutes:0,calories:0,source:'iphone-archive'});
+      if(isBadmintonSection(section)){
+        if(line&&!isNoneLogged(line)&&(/logged|已记录|有记录|羽毛球/i.test(line))){
+          imported.badminton.push({id:crypto.randomUUID(),date:day,minutes:0,calories:0,source:'iphone-archive'});
+        }
       }
     }
     flushMeal();flushWorkout();
@@ -67,11 +98,11 @@
   }
 
   window.openIPhoneImport=function(){
-    modal(`<h2>导入之前 iPhone App 的记录</h2>
-      <div class="surface-note">在 iPhone App 的“成长时间线 → 导出成长档案”导出 ZIP。把 ZIP 解压后，选择里面的 <strong>archive.md</strong>。这里会把饮食、体重、睡眠、健身和羽毛球历史合并到 Windows；不会删除任何现有 Windows 数据。</div>
+    modal(`<h2>重新导入 iPhone 历史记录</h2>
+      <div class="surface-note">选择之前导出的 ZIP 里的 <strong>archive.md</strong>。新版导入器已经兼容中文健身格式（千克 / 次 / 组 / RPE）和羽毛球记录。重复导入会自动去重，不会删除 Windows 现有数据。</div>
       <div class="field"><label>选择 archive.md</label><input id="iphoneArchiveFile" type="file" accept=".md,text/markdown,text/plain"></div>
       <button type="button" class="primary" onclick="importIPhoneArchive()">导入并合并</button>
-      <div class="surface-note">照片仍保留在原导出 ZIP 里；等云端照片存储接好后再统一上传，不会要求你重新拍。</div>`);
+      <div class="surface-note">你的饮食、体重和睡眠不会被覆盖；这次主要用来补回之前漏掉的健身和羽毛球历史。</div>`);
   };
 
   window.importIPhoneArchive=async function(){
@@ -81,8 +112,7 @@
       const data=parseArchive(await file.text());
       mergeImported(data);
       closeModal();
-      const count=data.meals.length+data.workouts.length+data.badminton.length+data.weights.length+data.sleep.length;
-      alert(`导入完成：合并了 ${count} 条历史记录。原 Windows 数据没有被删除。`);
+      alert(`导入完成：饮食 ${data.meals.length}，健身 ${data.workouts.length}，羽毛球 ${data.badminton.length}，体重 ${data.weights.length}，睡眠 ${data.sleep.length}。重复记录已自动去重。`);
     }catch(e){console.error(e);alert('导入失败：请确认选择的是 iPhone 成长档案里的 archive.md');}
   };
 
