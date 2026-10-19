@@ -1,4 +1,4 @@
-const CACHE='duoduo-fitness-v5';
+const CACHE='duoduo-fitness-v6';
 const ASSETS=[
   './',
   './index.html',
@@ -6,9 +6,11 @@ const ASSETS=[
   './v2.css',
   './cloud.css',
   './workout.css',
+  './food-photo.css',
   './app-v2.js',
   './macro-tracking.js',
   './workout-tracking.js',
+  './food-photo.js',
   './cloud-config.js',
   './cloud-sync.js',
   './iphone-import.js',
