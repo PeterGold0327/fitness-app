@@ -18,6 +18,14 @@
     };
   }
 
+  function targetCalories(target) {
+    return {
+      protein: target.protein * 4,
+      carbs: target.carbs * 4,
+      fat: target.fat * 9
+    };
+  }
+
   window.openMeal = function openMeal() {
     modal(`
       <h2>记录今天吃的</h2>
@@ -51,6 +59,7 @@
     const m = meals();
     const total = mealTotals(m);
     const target = macroTargets();
+    const targetKcal = targetCalories(target);
     const remainingCalories = Math.max(0, target.calories - total.calories);
     const remainingProtein = Math.max(0, target.protein - total.protein);
     const remainingCarbs = Math.max(0, target.carbs - total.carbs);
@@ -63,8 +72,8 @@
         </div>
         <div class="budget-main">
           <div class="hero-kicker">TODAY'S NUTRITION</div>
-          <h3>今天还可以吃 ${Math.round(remainingCalories)} kcal</h3>
-          <p>你可以直接在 Windows 输入今天吃了什么，以及热量、蛋白质、碳水和脂肪。这里会自动累计。</p>
+          <h3>你的每日目标：${Math.round(target.calories)} kcal</h3>
+          <p>按当前目标自动分配：蛋白质 ${Math.round(target.protein)}g、脂肪 ${Math.round(target.fat)}g，剩余热量给碳水，所以碳水约 ${Math.round(target.carbs)}g。</p>
           <div class="macro-row macro-row-four">
             <div class="macro"><strong>${Math.round(total.protein)} / ${Math.round(target.protein)}g</strong><span>蛋白质 · 还差 ${Math.round(remainingProtein)}g</span></div>
             <div class="macro"><strong>${Math.round(total.carbs)} / ${Math.round(target.carbs)}g</strong><span>碳水 · 还差 ${Math.round(remainingCarbs)}g</span></div>
@@ -72,6 +81,17 @@
             <div class="macro"><strong>${Math.round(total.calories)} / ${Math.round(target.calories)}</strong><span>总热量 kcal</span></div>
           </div>
         </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head"><div class="section-title">每天应该吃多少</div><span class="subtle">按当前 2700 kcal 目标自动计算</span></div>
+        <div class="stat-strip">
+          <div class="stat-card"><div class="stat-label">蛋白质</div><div class="stat-value">${Math.round(target.protein)}g</div><div class="stat-note">≈ ${Math.round(targetKcal.protein)} kcal</div></div>
+          <div class="stat-card"><div class="stat-label">碳水</div><div class="stat-value">${Math.round(target.carbs)}g</div><div class="stat-note">≈ ${Math.round(targetKcal.carbs)} kcal</div></div>
+          <div class="stat-card"><div class="stat-label">脂肪</div><div class="stat-value">${Math.round(target.fat)}g</div><div class="stat-note">≈ ${Math.round(targetKcal.fat)} kcal</div></div>
+          <div class="stat-card"><div class="stat-label">总热量</div><div class="stat-value">${Math.round(target.calories)}</div><div class="stat-note">kcal / 天</div></div>
+        </div>
+        <div class="surface-note" style="margin-top:14px">计算方式：蛋白质 4 kcal/g、碳水 4 kcal/g、脂肪 9 kcal/g。当前默认是蛋白质 ${Math.round(target.protein)}g + 脂肪 ${Math.round(target.fat)}g，碳水自动补足到 ${Math.round(target.calories)} kcal。</div>
       </section>
 
       <button class="primary" onclick="openMeal()">＋ 手动记录今天吃的</button>
