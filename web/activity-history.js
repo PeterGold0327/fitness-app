@@ -30,7 +30,8 @@
   if(typeof original==='function'){
     window.training=function trainingWithHistory(){
       const html=original();
-      return html.replace('</div>',`${historyHtml()}</div>`);
+      const end=html.lastIndexOf('</div>');
+      return end>=0?html.slice(0,end)+historyHtml()+html.slice(end):html+historyHtml();
     };
   }
 
