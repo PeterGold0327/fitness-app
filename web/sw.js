@@ -1,4 +1,4 @@
-const CACHE='duoduo-fitness-v9';
+const CACHE='duoduo-fitness-v10';
 const ASSETS=[
   './',
   './index.html',
