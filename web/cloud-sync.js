@@ -50,6 +50,7 @@
     const cloud=data.payload||{};
     if(!sameData(local,cloud)){
       // Safety first: never silently discard local history. Merge array records by id/date and prefer local profile edits.
+      // Apple Health is imported server-side, so the cloud copy is authoritative and must win over stale browser data.
       const merged=mergeSnapshots(cloud,local);
       originalSetItem.call(localStorage,STORAGE_KEY,JSON.stringify(merged));
       if(typeof state!=='undefined') state={...state,...merged};
@@ -72,6 +73,14 @@
     merged.badminton=mergeList(cloud.badminton,local.badminton,x=>x.id||`${x.date}|${x.minutes||0}|${x.calories||0}`);
     merged.weights=mergeList(cloud.weights,local.weights,x=>x.date);
     merged.sleep=mergeList(cloud.sleep,local.sleep,x=>x.date);
+    const localHealth=local.health&&typeof local.health==='object'?local.health:{};
+    const cloudHealth=cloud.health&&typeof cloud.health==='object'?cloud.health:{};
+    merged.health={
+      ...localHealth,
+      ...cloudHealth,
+      daily:{...(localHealth.daily||{}),...(cloudHealth.daily||{})}
+    };
+    if(!Object.keys(merged.health.daily||{}).length&&!cloudHealth.updatedAt&&!localHealth.updatedAt)delete merged.health;
     return merged;
   }
 
@@ -91,7 +100,7 @@
       modal(`<h2>云端还未配置</h2><div class="surface-note">代码已经准备好。下一步只需要创建一个 Supabase 项目，并把 Project URL 和 anon/publishable key 填入 cloud-config.js。不会删除现在 Windows 或 iPhone 里的任何数据。</div>`);return;
     }
     if(user){
-      modal(`<h2>云端账号</h2><div class="surface-note">已登录：${esc(user.email||'')}</div><div class="quick-row"><button type="button" class="primary" onclick="window.duoduoCloudPush()">立即备份</button><button type="button" class="secondary" onclick="window.duoduoCloudSignOut()">退出登录</button></div>`);return;
+      modal(`<h2>云端账号</h2><div class="surface-note">已登录：${esc(user.email||'')}</div><div class="quick-row"><button type="button" class="primary" onclick="window.duoduoCloudPush()">立即备份</button><button type="button" class="secondary" onclick="window.duoduoCloudPull()">读取最新云端</button><button type="button" class="secondary" onclick="window.duoduoCloudSignOut()">退出登录</button></div>`);return;
     }
     modal(`<h2>登录 / 注册</h2><div class="field"><label>邮箱</label><input id="cloudEmail" type="email" autocomplete="email"></div><div class="field"><label>密码</label><input id="cloudPassword" type="password" minlength="6" autocomplete="current-password"></div><div class="grid2"><button type="button" class="primary" onclick="window.duoduoCloudLogin()">登录</button><button type="button" class="secondary" onclick="window.duoduoCloudRegister()">注册</button></div><div class="surface-note">第一次登录时，如果云端没有数据，会先把当前 Windows 浏览器里的记录上传；不会覆盖掉现有本地数据。</div>`);
   }
@@ -115,6 +124,7 @@
   window.duoduoCloudRegister=async()=>{try{await signUp(document.querySelector('#cloudEmail').value.trim(),document.querySelector('#cloudPassword').value)}catch(e){alert('注册失败：'+e.message)}};
   window.duoduoCloudSignOut=async()=>{await signOut();closeModal?.();};
   window.duoduoCloudPush=async()=>{await pushNow();closeModal?.();};
+  window.duoduoCloudPull=async()=>{await pullOrSeed();closeModal?.();};
   window.duoduoCloudOpen=openAuth;
   window.addEventListener('DOMContentLoaded',init);
 })();
