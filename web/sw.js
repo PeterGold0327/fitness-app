@@ -1,0 +1,31 @@
+const CACHE='duoduo-fitness-v11';
+const ASSETS=[
+  './',
+  './index.html',
+  './styles.css',
+  './v2.css',
+  './cloud.css',
+  './workout.css',
+  './food-photo.css',
+  './history.css',
+  './app-v2.js',
+  './macro-tracking.js',
+  './workout-tracking.js',
+  './activity-history.js',
+  './food-photo.js',
+  './history-view.js',
+  './cloud-config.js',
+  './cloud-sync.js',
+  './iphone-import.js',
+  './manifest.webmanifest'
+];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET')return;
+  e.respondWith(fetch(e.request).then(r=>{
+    const copy=r.clone();
+    caches.open(CACHE).then(c=>c.put(e.request,copy));
+    return r;
+  }).catch(()=>caches.match(e.request)));
+});
