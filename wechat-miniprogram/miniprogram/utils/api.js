@@ -1,6 +1,17 @@
 const cfg = require('../config');
 const SESSION_KEY = 'duoduo-supabase-session';
 
+function friendlyNetworkError(err) {
+  const msg = String(err?.errMsg || err?.message || '网络请求失败');
+  const lower = msg.toLowerCase();
+  if (lower.includes('domain') || lower.includes('url not in domain list') || lower.includes('合法域名')) {
+    return new Error('Supabase 域名还没有加入微信 request 合法域名。开发工具可先关闭域名校验，真机前再到小程序后台配置。');
+  }
+  if (lower.includes('timeout')) return new Error('网络请求超时，请检查网络后再试');
+  if (lower.includes('ssl') || lower.includes('tls')) return new Error('HTTPS/TLS 连接失败，请检查小程序服务器域名配置');
+  return new Error(msg.replace(/^request:fail\s*/i, '') || '网络请求失败');
+}
+
 function request(options) {
   return new Promise((resolve, reject) => {
     wx.request({
@@ -9,7 +20,7 @@ function request(options) {
         if (res.statusCode >= 200 && res.statusCode < 300) resolve(res.data);
         else reject(new Error((res.data && (res.data.msg || res.data.message || res.data.error_description || res.data.error)) || `请求失败 ${res.statusCode}`));
       },
-      fail: reject
+      fail(err) { reject(friendlyNetworkError(err)); }
     });
   });
 }
