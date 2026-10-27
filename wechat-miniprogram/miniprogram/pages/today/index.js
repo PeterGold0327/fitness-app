@@ -1,7 +1,8 @@
 const h=require('../../utils/helpers');
 const app=getApp();
 
-const DEFAULT_BREAKFAST={
+const FALLBACK_BREAKFAST={
+  label:'我的默认早餐',
   name:'250g酸奶 2个燕麦 30g蓝莓 12g南瓜子 香蕉',
   calories:560,
   protein:31,
@@ -15,8 +16,8 @@ function goal(profile,key,fallback){
   return fallback;
 }
 
-function isDefaultBreakfast(meal,date){
-  return meal?.date===date&&(meal?.source==='default-breakfast-wechat'||meal?.name===DEFAULT_BREAKFAST.name);
+function isDefaultBreakfast(meal,date,template){
+  return meal?.date===date&&(meal?.source==='default-breakfast-wechat'||meal?.templateId==='default-breakfast'||meal?.name===template.name);
 }
 
 Page({
@@ -24,7 +25,7 @@ Page({
     loading:true,date:'',calories:0,remain:0,goal:2700,
     protein:0,proteinGoal:130,carbs:0,carbGoal:350,fat:0,fatGoal:80,
     proteinPct:0,carbPct:0,fatPct:0,meals:[],activities:[],weight:'--',
-    breakfast:DEFAULT_BREAKFAST,breakfastLogged:false,breakfastSaving:false
+    breakfast:FALLBACK_BREAKFAST,breakfastLogged:false,breakfastSaving:false
   },
   onShow(){
     if(this.getTabBar)this.getTabBar()?.setData({selected:0});
@@ -36,6 +37,7 @@ Page({
     try{
       const s=await app.getSnapshot(true);
       const date=h.todayKey();
+      const template={...FALLBACK_BREAKFAST,...(s.profile?.breakfastTemplate||{})};
       const meals=(s.meals||[]).filter(x=>x.date===date);
       const t=h.totals(meals),p=s.profile||{};
       const calorieGoal=goal(p,'calories',2700),proteinGoal=goal(p,'protein',130),carbGoal=goal(p,'carbs',350),fatGoal=goal(p,'fat',80);
@@ -53,7 +55,8 @@ Page({
         fatPct:Math.min(100,Math.round(t.fat/fatGoal*100)),
         meals,activities:[...gyms,...bad,...other],
         weight:weights[0]?`${Number(weights[0].kg||weights[0].weight||0).toFixed(1)} kg`:'--',
-        breakfastLogged:meals.some(m=>isDefaultBreakfast(m,date)),
+        breakfast:template,
+        breakfastLogged:meals.some(m=>isDefaultBreakfast(m,date,template)),
         breakfastSaving:false
       });
     }catch(e){
@@ -71,16 +74,14 @@ Page({
     try{
       const s=await app.getSnapshot(true);
       const date=h.todayKey();
+      const template={...FALLBACK_BREAKFAST,...(s.profile?.breakfastTemplate||{})};
       s.meals=Array.isArray(s.meals)?s.meals:[];
-      if(s.meals.some(m=>isDefaultBreakfast(m,date))){
+      if(s.meals.some(m=>isDefaultBreakfast(m,date,template))){
         this.setData({breakfastLogged:true,breakfastSaving:false});
         wx.showToast({title:'今天早餐已经记录过了',icon:'none'});
         return;
       }
-      s.meals.push({
-        id:h.id(),date,...DEFAULT_BREAKFAST,
-        source:'default-breakfast-wechat'
-      });
+      s.meals.push({id:h.id(),date,name:template.name,calories:h.num(template.calories),protein:h.num(template.protein),carbs:h.num(template.carbs),fat:h.num(template.fat),source:'default-breakfast-wechat',templateId:'default-breakfast'});
       await app.saveSnapshot(s);
       wx.showToast({title:'早餐已记录',icon:'success'});
       await this.load();
@@ -89,6 +90,7 @@ Page({
       this.setData({breakfastSaving:false});
     }
   },
+  editBreakfast(){wx.navigateTo({url:'/pages/breakfast/index'});},
   photo(){wx.switchTab({url:'/pages/camera/index'});},
   workout(){wx.navigateTo({url:'/pages/workout/index'});},
   calendar(){wx.switchTab({url:'/pages/calendar/index'});}
