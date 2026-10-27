@@ -1,3 +1,135 @@
+# Personal Fitness System / LeanLog
+
+This repository is part of my personal fitness and nutrition system. The project started as **LeanLog**, a native iPhone fitness app, but the wider system now also includes cross-device fitness tracking, Supabase-backed data, Apple Health data and AI-assisted coaching.
+
+## What this project is trying to build
+
+The goal is not only to create a workout logging app. The long-term goal is to build a personal fitness system that can:
+
+- record workouts at the **individual set level**
+- track weight, reps and RPE for progressive overload
+- remember previous performance for each exercise
+- provide next-session training suggestions
+- record meals, calories and macronutrients
+- remember frequently used foods and nutrition values
+- track body weight and nutrition trends
+- use Apple Health data such as sleep, activity and workouts
+- keep long-term fitness history
+- allow an AI agent to use historical data when giving training and nutrition advice
+
+The basic feedback loop is:
+
+**Record → Store → Analyse history → Recommend → Train/Eat → Record again**
+
+The system should become more useful as more personal data is collected.
+
+## System Architecture
+
+The current fitness project should be understood as several connected parts rather than only this iPhone repository.
+
+### 1. LeanLog — iPhone App
+
+LeanLog is the native iPhone application contained in this repository.
+
+Technology:
+
+- SwiftUI
+- SwiftData
+- iOS 17+
+- HealthKit
+- OpenAI-assisted food photo analysis
+
+Main functions include nutrition logging, food photo estimation, workout logging, workout templates, per-set weight/repetition tracking, RPE tracking, progression suggestions, body-weight trends, Apple Health integration and Growth Timeline history.
+
+LeanLog originally used local SwiftData as its main storage system.
+
+### 2. Fitness Web / Windows Interface
+
+A separate interface is used on Windows and other devices for recording and reviewing fitness data.
+
+The workout model records individual sets rather than only one weight for an entire exercise. Each set can store its own weight, reps and RPE so progression can be judged from actual performance rather than a single exercise-level value.
+
+### 3. Supabase — Shared Fitness Data
+
+The wider fitness system uses **Supabase** as a cloud data layer.
+
+Current stored data includes areas such as:
+
+- workouts
+- exercise sets
+- weight / reps / RPE
+- meals
+- calories and macros
+- body weight
+- profile and nutrition targets
+- workout templates
+- frequently used food information
+- imported health/activity information
+- sleep and activity summaries
+
+Supabase allows the fitness history to be accessed independently of one device.
+
+The long-term architecture is intended to move toward:
+
+**iPhone + Windows/Web + Health data + AI Agent → shared fitness data**
+
+rather than keeping important fitness history isolated on individual devices.
+
+> Important: the original LeanLog implementation in this repository is still primarily SwiftData/local-first. Supabase belongs to the wider fitness system and should not be confused with the original local persistence architecture described later in this README.
+
+## Training Logic
+
+The training system is designed mainly around **hypertrophy**.
+
+It does not use a simple rule such as “hit the top of the rep range, then automatically increase weight”. Recommendations should consider previous weight, repetitions, RPE, performance across individual sets and recent training history.
+
+The goal is **long-term progressive overload**, not forcing weight increases every workout.
+
+## Nutrition Logic
+
+Nutrition tracking combines manual input with reusable food information and AI-assisted photo estimation.
+
+For foods used frequently, confirmed nutrition information can be remembered so that the system does not need to estimate the same product repeatedly. When reliable manual information is available, it should take priority over AI visual estimation.
+
+## Health and Recovery
+
+Apple Health / HealthKit data can provide context such as sleep, steps, active energy, heart rate, workouts, badminton sessions and body weight.
+
+The longer-term goal is to combine recovery information with gym performance, so temporary changes in RPE or performance can be interpreted in context rather than automatically treated as strength loss.
+
+## AI Agent Role
+
+An AI agent can act as an analysis layer on top of the fitness history.
+
+Instead of treating every question independently, the agent should use previous records when answering questions such as:
+
+- What weight did I use last time?
+- What should I use for this exercise today?
+- Am I progressing on this movement?
+- Is my weekly training volume increasing?
+- Did my RPE increase at the same load?
+- Am I eating enough protein?
+- Is my body weight moving toward my goal?
+- Could poor recovery explain today's performance?
+
+The intended behaviour is:
+
+**historical data first → analysis → personalised recommendation**
+
+rather than generic fitness advice.
+
+## Current Direction
+
+The project is gradually moving from a collection of fitness logging features toward a unified personal fitness platform.
+
+The intended architecture is:
+
+**LeanLog iPhone App + Windows/Web Interface + Supabase + Apple Health + AI Agent = Personal Fitness System**
+
+The sections below document the current native LeanLog iPhone implementation in more technical detail.
+
+---
+
 # LeanLog — personal fitness MVP
 
 Native iPhone fitness and nutrition app with an embedded Daily Coach: one or two practical next actions, nutrition photo logging, repeatable gym training and Growth Timeline history. SwiftUI + SwiftData, iOS 17+, local data, no account or backend. The default profile is 178 cm / 63 kg with 2700 kcal, 130 g protein and 70 g fat targets.
