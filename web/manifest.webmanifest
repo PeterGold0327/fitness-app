@@ -1,0 +1,10 @@
+{
+  "name": "多多 Fitness",
+  "short_name": "多多 Fitness",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#07090a",
+  "theme_color": "#07090a",
+  "lang": "zh-CN",
+  "description": "个人增肌、饮食、训练与成长记录 Agent。"
+}
