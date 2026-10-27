@@ -35,10 +35,9 @@
   <view class="breakfast-card {{breakfastLogged?'done':''}}">
     <view class="breakfast-icon">☀️</view>
     <view class="breakfast-copy">
-      <view class="breakfast-kicker">MY BREAKFAST</view>
-      <view class="breakfast-title">我的默认早餐</view>
-      <view class="breakfast-food">250g 酸奶 · 2个燕麦 · 30g 蓝莓 · 12g 南瓜子 · 香蕉</view>
-      <view class="breakfast-macro">560 kcal · P31 · C68 · F20</view>
+      <view class="breakfast-head"><view><view class="breakfast-kicker">MY BREAKFAST</view><view class="breakfast-title">{{breakfast.label||'我的默认早餐'}}</view></view><text class="breakfast-edit" bindtap="editBreakfast">编辑</text></view>
+      <view class="breakfast-food">{{breakfast.name}}</view>
+      <view class="breakfast-macro">{{breakfast.calories}} kcal · P{{breakfast.protein}} · C{{breakfast.carbs}} · F{{breakfast.fat}}</view>
     </view>
     <button class="breakfast-action" disabled="{{breakfastLogged||breakfastSaving}}" bindtap="addBreakfast">{{breakfastLogged?'已记录':breakfastSaving?'记录中':'一键记录'}}</button>
   </view>
