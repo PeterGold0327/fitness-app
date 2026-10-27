@@ -1,0 +1,35 @@
+{
+  "pages": [
+    "pages/today/index",
+    "pages/food/index",
+    "pages/camera/index",
+    "pages/calendar/index",
+    "pages/progress/index",
+    "pages/login/index",
+    "pages/day/index",
+    "pages/workout/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#F5F8F7",
+    "navigationBarTitleText": "多多 Fitness",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F8F7"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#8B9792",
+    "selectedColor": "#1F7A69",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {"pagePath":"pages/today/index","text":"今天"},
+      {"pagePath":"pages/food/index","text":"饮食"},
+      {"pagePath":"pages/camera/index","text":"记录"},
+      {"pagePath":"pages/calendar/index","text":"日历"},
+      {"pagePath":"pages/progress/index","text":"进展"}
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

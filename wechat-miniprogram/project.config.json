@@ -1,0 +1,15 @@
+{
+  "description": "多多 Fitness 微信小程序",
+  "miniprogramRoot": "miniprogram/",
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "duoduo-fitness",
+  "setting": {
+    "useCompilerPlugins": false,
+    "es6": true,
+    "enhance": true,
+    "minified": true,
+    "postcss": true,
+    "urlCheck": false
+  }
+}
