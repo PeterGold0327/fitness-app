@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#07090b" />
+  <meta name="theme-color" content="#090a0b" />
   <title>多多 Fitness</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="history.css" />
   <link rel="stylesheet" href="calendar.css" />
   <link rel="stylesheet" href="ui-refresh.css" />
+  <link rel="stylesheet" href="premium-ui.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -31,7 +32,7 @@
     <nav class="tabbar" aria-label="主导航">
       <button data-tab="home" class="tab active">⌂<span>今天</span></button>
       <button data-tab="nutrition" class="tab">◎<span>营养</span></button>
-      <button type="button" class="capture-tab" onclick="openMeal()" aria-label="拍照记录饮食">📷<span>拍照</span></button>
+      <button type="button" class="capture-tab" onclick="openMeal()" aria-label="拍照记录饮食">＋<span>记录</span></button>
       <button data-tab="training" class="tab">▦<span>日历</span></button>
       <button data-tab="progress" class="tab">↗<span>进展</span></button>
       <button data-tab="settings" class="tab">⚙<span>设置</span></button>
@@ -56,6 +57,7 @@
   <script src="history-view.js"></script>
   <script src="calendar-view.js"></script>
   <script src="watch-strength-merge.js"></script>
+  <script src="premium-ui.js"></script>
   <script src="iphone-import.js"></script>
 </body>
 </html>
