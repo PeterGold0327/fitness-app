@@ -1,4 +1,4 @@
-const CACHE='duoduo-fitness-v13';
+const CACHE='duoduo-fitness-v14';
 const ASSETS=[
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS=[
   './history.css',
   './calendar.css',
   './ui-refresh.css',
+  './premium-ui.css',
   './app-v2.js',
   './macro-tracking.js',
   './workout-tracking.js',
@@ -18,6 +19,7 @@ const ASSETS=[
   './history-view.js',
   './calendar-view.js',
   './watch-strength-merge.js',
+  './premium-ui.js',
   './cloud-config.js',
   './cloud-sync.js',
   './iphone-import.js',
