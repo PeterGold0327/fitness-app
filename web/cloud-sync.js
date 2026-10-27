@@ -125,9 +125,25 @@
     mountChip();
     if(!ready||!window.supabase){status(ready?'云库组件未加载':'待配置');return;}
     client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+    window.duoduoSupabaseClient=client;
     const {data}=await client.auth.getSession();user=data.session?.user||null;
     if(user){status('已登录，正在同步…');await pullOrSeed();startAutoPull();}else status('未登录');
-    client.auth.onAuthStateChange(async(_event,session)=>{user=session?.user||null;if(user){closeModal?.();status('已登录，正在同步…');await pullOrSeed();startAutoPull();}else{clearInterval(autoPullTimer);autoPullTimer=null;status('未登录');}});
+    client.auth.onAuthStateChange(async(event,session)=>{
+      user=session?.user||null;
+      if(!user||event==='SIGNED_OUT'){
+        clearInterval(autoPullTimer);autoPullTimer=null;status('未登录');return;
+      }
+      if(event==='SIGNED_IN'){
+        closeModal?.();
+        status('已登录，正在同步…');
+        await pullOrSeed();
+        startAutoPull();
+        return;
+      }
+      if(event==='TOKEN_REFRESHED'){
+        status('已登录','good');
+      }
+    });
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&user)pullOrSeed({quiet:true});});
   }
 
