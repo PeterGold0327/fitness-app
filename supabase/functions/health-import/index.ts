@@ -9,6 +9,7 @@ function num(value:any){const n=Number(value);return Number.isFinite(n)?n:null}
 function ensureDay(days:Record<string,any>,date:string){if(!days[date])days[date]={};return days[date]}
 function add(day:any,key:string,value:any){const n=num(value);if(n===null)return;day[key]=(Number(day[key])||0)+n}
 function average(list:number[]){return list.length?list.reduce((a,b)=>a+b,0)/list.length:null}
+function isFunctionalStrength(w:any){const type=String(w?.activityType||'').toLowerCase();const name=String(w?.name||'').trim();return type==='functional_strength_training'||name==='功能性力量训练'}
 
 function normalizeMetrics(raw:any){
   const metrics=Array.isArray(raw?.data?.metrics)?raw.data.metrics:[]
@@ -51,7 +52,7 @@ function normalizeWorkouts(raw:any){
   const rows=Array.isArray(raw?.data?.workouts)?raw.data.workouts:[]
   return rows.map((w:any)=>{
     const activity=Array.isArray(w?.activities)?w.activities[0]:null
-    const active= num(activity?.metrics?.activeEnergy?.qty) ?? num(w?.activeEnergyBurned?.qty)
+    const active=num(activity?.metrics?.activeEnergy?.qty)??num(w?.activeEnergyBurned?.qty)
     const activeUnits=String(activity?.metrics?.activeEnergy?.units||w?.activeEnergyBurned?.units||'')
     const calories=active===null?null:(activeUnits.toLowerCase()==='kj'?active/4.184:active)
     const seconds=num(w?.duration)??num(activity?.duration)??0
@@ -75,6 +76,46 @@ function normalizeWorkouts(raw:any){
   }).filter((w:any)=>w.date)
 }
 
+function mergeFunctionalStrength(payload:any, healthWorkouts:any[]){
+  const gym=Array.isArray(payload.workouts)?[...payload.workouts]:[]
+  const strength=healthWorkouts.filter(isFunctionalStrength)
+  for(const watch of strength){
+    const watchId=String(watch?.id||'')
+    let index=gym.findIndex((x:any)=>String(x?.watchWorkoutId||'')===watchId)
+    if(index<0)index=gym.findIndex((x:any)=>x?.date===watch.date&&x?.source==='apple-health-strength')
+    if(index<0)index=gym.findIndex((x:any)=>x?.date===watch.date&&x?.source!=='apple-health-strength'&&!x?.watchWorkoutId&&Array.isArray(x?.exercises)&&x.exercises.length>0)
+    if(index<0)index=gym.findIndex((x:any)=>x?.date===watch.date&&x?.source!=='apple-health-strength'&&!x?.watchWorkoutId)
+
+    const watchFields:any={
+      watchWorkoutId:watchId,
+      watchStart:watch.start||null,
+      watchEnd:watch.end||null,
+      watchHeartRateAvg:watch.heartRateAvg??null,
+      watchHeartRateMin:watch.heartRateMin??null,
+      watchHeartRateMax:watch.heartRateMax??null,
+      metricsSource:'apple-watch'
+    }
+    if(num(watch.minutes)!==null)watchFields.minutes=num(watch.minutes)
+    if(num(watch.calories)!==null)watchFields.calories=num(watch.calories)
+
+    if(index>=0){
+      gym[index]={...gym[index],...watchFields}
+    }else{
+      gym.push({
+        id:`watch-strength-${watchId||crypto.randomUUID()}`,
+        date:watch.date,
+        name:'健身',
+        split:'健身',
+        source:'apple-health-strength',
+        exercises:[],
+        ...watchFields
+      })
+    }
+  }
+  payload.workouts=gym
+  return healthWorkouts.filter((w:any)=>!isFunctionalStrength(w))
+}
+
 Deno.serve(async(req:Request)=>{
   if(req.method!=='POST')return json(405,{error:'method_not_allowed'})
   try{
@@ -96,9 +137,13 @@ Deno.serve(async(req:Request)=>{
     const normalizedDays=normalizeMetrics(raw);const normalizedWorkouts=normalizeWorkouts(raw)
     if(Object.keys(normalizedDays).length||normalizedWorkouts.length){
       const {data:snapshot,error:snapshotError}=await admin.from('fitness_snapshots').select('payload').eq('user_id',tokenRow.user_id).maybeSingle();if(snapshotError)throw snapshotError
-      const payload=snapshot?.payload&&typeof snapshot.payload==='object'?snapshot.payload:{};const health=payload.health&&typeof payload.health==='object'?payload.health:{};const daily=health.daily&&typeof health.daily==='object'?health.daily:{};const existing=Array.isArray(health.workouts)?health.workouts:[]
+      const payload=snapshot?.payload&&typeof snapshot.payload==='object'?snapshot.payload:{}
+      const health=payload.health&&typeof payload.health==='object'?payload.health:{}
+      const daily=health.daily&&typeof health.daily==='object'?health.daily:{}
+      const existing=Array.isArray(health.workouts)?health.workouts:[]
       const byId=new Map(existing.map((w:any)=>[String(w?.id||''),w]));for(const w of normalizedWorkouts)byId.set(String(w.id),w)
-      payload.health={...health,source:'health-auto-export',updatedAt:new Date().toISOString(),daily:{...daily,...normalizedDays},workouts:[...byId.values()]}
+      const visibleHealthWorkouts=mergeFunctionalStrength(payload,[...byId.values()])
+      payload.health={...health,source:'health-auto-export',updatedAt:new Date().toISOString(),daily:{...daily,...normalizedDays},workouts:visibleHealthWorkouts}
       const {error:updateError}=await admin.from('fitness_snapshots').upsert({user_id:tokenRow.user_id,payload,schema_version:1},{onConflict:'user_id'});if(updateError)throw updateError
     }
     return json(200,{ok:true,normalizedDays:Object.keys(normalizedDays).length,normalizedWorkouts:normalizedWorkouts.length})
