@@ -1,1 +1,41 @@
-<view class="page"><view class="eyebrow">NUTRITION</view><view class="title">饮食</view><view class="summary surface"><view class="summary-main"><text>{{totals.calories}}</text><small>kcal 今日已摄入</small></view><view class="summary-macros"><view><text>{{totals.protein}}g</text><small>蛋白质</small></view><view><text>{{totals.carbs}}g</text><small>碳水</small></view><view><text>{{totals.fat}}g</text><small>脂肪</small></view></view></view><button class="record-btn" bindtap="record"><view class="plus">＋</view><view><text>记录这一餐</text><small>拍张照片，或者自己输入</small></view></button><view class="section"><view class="section-head"><view class="section-title">今天</view><text class="pill">{{meals.length}} 餐</text></view><view class="food-list surface"><block wx:if="{{meals.length}}"><view wx:for="{{meals}}" wx:key="id" class="food-row"><view class="food-index">{{index+1}}</view><view class="food-main"><text>{{item.name||'一餐'}}</text><small>P {{item.protein||0}}g · C {{item.carbs||0}}g · F {{item.fat||0}}g</small><view wx:if="{{item.items&&item.items.length}}" class="food-items"><text wx:for="{{item.items}}" wx:key="index">{{item.name}}{{item.grams?' '+item.grams+'g':''}}</text></view></view><text class="kcal">{{item.calories||0}}<small> kcal</small></text></view></block><view wx:else class="empty">还没记录。第一餐从拍照开始就好。</view></view></view></view>
+<view class="page">
+  <view class="eyebrow">NUTRITION</view>
+  <view class="title">饮食</view>
+
+  <view class="summary surface">
+    <view class="summary-main"><text>{{totals.calories}}</text><small>kcal 今日已摄入</small></view>
+    <view class="summary-macros">
+      <view><text>{{totals.protein}}g</text><small>蛋白质</small></view>
+      <view><text>{{totals.carbs}}g</text><small>碳水</small></view>
+      <view><text>{{totals.fat}}g</text><small>脂肪</small></view>
+    </view>
+  </view>
+
+  <button class="record-btn" bindtap="record">
+    <view class="plus">＋</view>
+    <view><text>记录这一餐</text><small>拍张照片，或者自己输入</small></view>
+  </button>
+
+  <view class="section">
+    <view class="section-head"><view class="section-title">今天</view><text class="pill">{{meals.length}} 餐</text></view>
+    <view class="food-list surface">
+      <block wx:if="{{meals.length}}">
+        <view wx:for="{{meals}}" wx:key="id" class="food-row">
+          <view class="food-index">{{index+1}}</view>
+          <view class="food-main">
+            <text>{{item.name||'一餐'}}</text>
+            <small>P {{item.protein||0}}g · C {{item.carbs||0}}g · F {{item.fat||0}}g</small>
+            <view wx:if="{{item.items&&item.items.length}}" class="food-items">
+              <text wx:for="{{item.items}}" wx:key="index">{{item.name}}{{item.grams?' '+item.grams+'g':''}}</text>
+            </view>
+          </view>
+          <view class="food-actions">
+            <text class="kcal">{{item.calories||0}}<small> kcal</small></text>
+            <button class="delete-meal" data-id="{{item.id}}" loading="{{deletingId===item.id}}" disabled="{{!!deletingId}}" bindtap="deleteMeal">删除</button>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="empty">还没记录。第一餐从拍照开始就好。</view>
+    </view>
+  </view>
+</view>
