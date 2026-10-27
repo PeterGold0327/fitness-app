@@ -2,6 +2,8 @@
 
 This repository is part of my personal fitness and nutrition system. The project started as **LeanLog**, a native iPhone fitness app, but the wider system now also includes cross-device fitness tracking, Supabase-backed data, Apple Health data and AI-assisted coaching.
 
+> For the complete cross-device architecture, data-source rules and AI-agent behaviour, see **[System Architecture](docs/SYSTEM_ARCHITECTURE.md)**.
+
 ## What this project is trying to build
 
 The goal is not only to create a workout logging app. The long-term goal is to build a personal fitness system that can:
@@ -176,7 +178,7 @@ English is the fallback; Simplified Chinese (`zh-Hans`) follows the iPhone langu
 
 ## Structure
 
-```
+```text
 FitnessApp/
   FitnessApp.swift          App entry, SwiftData container, visible storage errors
   Models/Models.swift      Persisted profile, day state, meals/foods, weight,
