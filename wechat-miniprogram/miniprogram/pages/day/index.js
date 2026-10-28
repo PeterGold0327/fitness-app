@@ -1,5 +1,5 @@
 const h = require('../../utils/helpers');
-const { presentGymSessions } = require('../../utils/calendarMarkers');
+const { presentGymSessions, presentBadmintonSessions, otherHealthWorkouts } = require('../../utils/calendarMarkers');
 const app = getApp();
 
 Page({
@@ -19,8 +19,9 @@ Page({
         setsText: (e.setEntries || []).map(x => `${h.round(x.weight, 1)}kg × ${x.reps || '-'}${x.rpe ? ` · RPE ${x.rpe}` : ''}`).join('  /  ')
       }))
     }));
-    const badminton = (s.badminton || []).filter(x => x.date === date);
-    const other = (s.health?.workouts || []).filter(x => x.date === date && x.activityType !== 'functional_strength_training');
+    const healthToday = (s.health?.workouts || []).filter(x => x.date === date);
+    const badminton = presentBadmintonSessions((s.badminton || []).filter(x => x.date === date), healthToday);
+    const other = otherHealthWorkouts(healthToday);
     const weight = (s.weights || []).find(x => x.date === date);
     const health = s.health?.daily?.[date] || {};
     const sleep = health.sleepHours || ((s.sleep || []).find(x => x.date === date)?.hours);

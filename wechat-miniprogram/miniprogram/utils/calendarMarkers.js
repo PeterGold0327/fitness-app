@@ -137,6 +137,73 @@ function sameDay(list, date) {
   return (Array.isArray(list) ? list : []).filter(item => item && item.date === date);
 }
 
+// Recorded sessions only. activityType is the health field; the name is not used.
+function isRecordedBadminton(workout) {
+  return String(workout && workout.activityType || '').trim().toLowerCase() === 'badminton';
+}
+
+function identityKeys(item) {
+  const keys = [];
+  const id = String(item && item.id || '').trim();
+  const linked = String(item && (item.watchWorkoutId || item.healthWorkoutId) || '').trim();
+  if (id) keys.push('id:' + id);
+  if (linked) keys.push('id:' + linked);
+  const start = String(item && (item.start || item.watchStart) || '').trim();
+  if (start) keys.push('start:' + start);
+  const date = String(item && item.date || '');
+  const minutes = Math.round(Number(item && item.minutes) || 0);
+  const calories = Math.round(Number(item && item.calories) || 0);
+  if (date && (minutes || calories)) keys.push(`m:${date}|${minutes}|${calories}`);
+  return keys;
+}
+
+function sharesIdentity(a, b) {
+  const keys = new Set(identityKeys(b));
+  return identityKeys(a).some(key => keys.has(key));
+}
+
+function withBadmintonMetrics(primary, extra) {
+  const next = { ...primary };
+  if (!positive(next.minutes) && positive(extra.minutes)) next.minutes = extra.minutes;
+  if (!positive(next.calories) && positive(extra.calories)) next.calories = extra.calories;
+  if ((next.heartRateAvg == null || next.heartRateAvg === '') && extra.heartRateAvg != null && extra.heartRateAvg !== '') next.heartRateAvg = extra.heartRateAvg;
+  return next;
+}
+
+// badminton[] and health.workouts activityType "badminton", one card per session.
+function presentBadmintonSessions(entries, healthWorkouts) {
+  const manual = (Array.isArray(entries) ? entries : []).filter(item => item && item.date);
+  const watch = (Array.isArray(healthWorkouts) ? healthWorkouts : []).filter(item => item && item.date && isRecordedBadminton(item));
+  const claimed = new Set();
+  const claim = item => identityKeys(item).forEach(key => claimed.add(key));
+  const claimedAlready = item => identityKeys(item).some(key => claimed.has(key));
+  const out = [];
+  for (const entry of manual) {
+    if (claimedAlready(entry)) continue;
+    let match = watch.find(item => !claimedAlready(item) && sharesIdentity(entry, item));
+    if (!match && !positive(entry.minutes) && !positive(entry.calories)) {
+      const sameDayWatch = watch.filter(item => item.date === entry.date && !claimedAlready(item));
+      if (sameDayWatch.length === 1) match = sameDayWatch[0];
+    }
+    claim(entry);
+    if (match) claim(match);
+    out.push(match ? withBadmintonMetrics(entry, match) : { ...entry });
+  }
+  for (const item of watch) {
+    if (claimedAlready(item)) continue;
+    claim(item);
+    out.push({ ...item, name: item.name || '羽毛球' });
+  }
+  return out;
+}
+
+function otherHealthWorkouts(list) {
+  return (Array.isArray(list) ? list : []).filter(item => {
+    const type = String(item && item.activityType || '').trim().toLowerCase();
+    return type !== 'functional_strength_training' && type !== 'badminton';
+  });
+}
+
 function buildCalendarCells({ year, monthIndex, today, snapshot }) {
   const month = monthIndex;
   const first = new Date(year, month, 1);
@@ -148,11 +215,10 @@ function buildCalendarCells({ year, monthIndex, today, snapshot }) {
   for (let day = 1; day <= days; day++) {
     const date = `${year}-${pad(month + 1)}-${pad(day)}`;
     const dayWorkouts = sameDay(source.workouts, date);
+    const healthWorkouts = sameDay(source.health && source.health.workouts, date);
     const meals = sameDay(source.meals, date).length;
-    // Recorded badminton entries only. Nothing is inferred from plans or other workouts.
-    const bad = sameDay(source.badminton, date).length;
-    const watch = sameDay(source.health && source.health.workouts, date)
-      .filter(item => item.activityType !== 'functional_strength_training').length;
+    const bad = presentBadmintonSessions(sameDay(source.badminton, date), healthWorkouts).length;
+    const watch = otherHealthWorkouts(healthWorkouts).length;
     const manual = dayWorkouts.filter(item => !isWatchOnlyStrength(item)).length;
     const gymLabel = gymSplitLabel(dayWorkouts);
     cells.push({
@@ -180,6 +246,9 @@ function buildCalendarCells({ year, monthIndex, today, snapshot }) {
 module.exports = {
   gymSplitLabel,
   isWatchOnlyStrength,
+  isRecordedBadminton,
   presentGymSessions,
+  presentBadmintonSessions,
+  otherHealthWorkouts,
   buildCalendarCells
 };
