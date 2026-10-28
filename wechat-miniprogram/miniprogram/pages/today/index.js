@@ -24,7 +24,7 @@ Page({
   data:{
     loading:true,date:'',calories:0,remain:0,goal:2700,
     protein:0,proteinGoal:130,carbs:0,carbGoal:350,fat:0,fatGoal:80,
-    proteinPct:0,carbPct:0,fatPct:0,meals:[],activities:[],weight:'--',
+    proteinPct:0,carbPct:0,fatPct:0,meals:[],activities:[],weight:'--',weightInput:'',weightSaving:false,
     breakfast:FALLBACK_BREAKFAST,breakfastLogged:false,breakfastSaving:false
   },
   onShow(){
@@ -55,6 +55,7 @@ Page({
         fatPct:Math.min(100,Math.round(t.fat/fatGoal*100)),
         meals,activities:[...gyms,...bad,...other],
         weight:weights[0]?`${Number(weights[0].kg||weights[0].weight||0).toFixed(1)} kg`:'--',
+        weightInput:(()=>{const today=(s.weights||[]).find(x=>x.date===date);return today?String(h.round(Number(today.kg||today.weight||0),1)):'';})(),
         breakfast:template,
         breakfastLogged:meals.some(m=>isDefaultBreakfast(m,date,template)),
         breakfastSaving:false
@@ -88,6 +89,26 @@ Page({
     }catch(e){
       wx.showToast({title:'早餐记录失败',icon:'none'});
       this.setData({breakfastSaving:false});
+    }
+  },
+  weightInput(e){this.setData({weightInput:e.detail.value});},
+  async saveWeight(){
+    if(this.data.weightSaving)return;
+    const kg=h.round(h.num(this.data.weightInput),1);
+    if(!kg||kg<20||kg>200){wx.showToast({title:'请输入 20-200 kg 的体重',icon:'none'});return;}
+    this.setData({weightSaving:true});
+    try{
+      const s=await app.getSnapshot(true);
+      const date=h.todayKey();
+      s.weights=Array.isArray(s.weights)?s.weights:[];
+      s.weights=s.weights.filter(x=>x.date!==date);
+      s.weights.push({id:h.id(),date,kg});
+      await app.saveSnapshot(s);
+      wx.showToast({title:'体重已记录',icon:'success'});
+      await this.load();
+    }catch(e){
+      wx.showToast({title:'体重记录失败',icon:'none'});
+      this.setData({weightSaving:false});
     }
   },
   editBreakfast(){wx.navigateTo({url:'/pages/breakfast/index'});},

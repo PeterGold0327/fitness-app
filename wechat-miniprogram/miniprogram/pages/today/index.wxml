@@ -42,6 +42,15 @@
     <button class="breakfast-action" disabled="{{breakfastLogged||breakfastSaving}}" bindtap="addBreakfast">{{breakfastLogged?'已记录':breakfastSaving?'记录中':'一键记录'}}</button>
   </view>
 
+  <view class="weight-card surface">
+    <view class="weight-copy"><text class="weight-title">⚖️ 今天体重</text><text class="weight-hint">早上称完顺手记一下，进展页会跟着更新</text></view>
+    <view class="weight-row">
+      <input class="weight-input" type="digit" placeholder="例如 62.4" value="{{weightInput}}" bindinput="weightInput"/>
+      <text class="weight-unit">kg</text>
+      <button class="weight-btn" disabled="{{weightSaving}}" bindtap="saveWeight">{{weightSaving?'记录中':'记录体重'}}</button>
+    </view>
+  </view>
+
   <view class="quick">
     <button class="quick-main" bindtap="photo">
       <view class="quick-icon">＋</view>
