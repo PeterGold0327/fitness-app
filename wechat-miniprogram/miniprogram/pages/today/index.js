@@ -1,4 +1,5 @@
 const h=require('../../utils/helpers');
+const { presentGymSessions, presentBadmintonSessions, otherHealthWorkouts } = require('../../utils/calendarMarkers');
 const app=getApp();
 
 const FALLBACK_BREAKFAST={
@@ -41,9 +42,10 @@ Page({
       const meals=(s.meals||[]).filter(x=>x.date===date);
       const t=h.totals(meals),p=s.profile||{};
       const calorieGoal=goal(p,'calories',2700),proteinGoal=goal(p,'protein',130),carbGoal=goal(p,'carbs',350),fatGoal=goal(p,'fat',80);
-      const gyms=(s.workouts||[]).filter(x=>x.date===date).map(x=>({icon:'🏋',name:x.split||x.name||'健身',meta:[x.minutes?`${Math.round(x.minutes)} 分钟`:'',x.calories?`${Math.round(x.calories)} kcal`:''].filter(Boolean).join(' · ')}));
-      const bad=(s.badminton||[]).filter(x=>x.date===date).map(x=>({icon:'🏸',name:'羽毛球',meta:[x.minutes?`${Math.round(x.minutes)} 分钟`:'',x.calories?`${Math.round(x.calories)} kcal`:''].filter(Boolean).join(' · ')}));
-      const other=(s.health?.workouts||[]).filter(x=>x.date===date&&x.activityType!=='functional_strength_training').map(x=>({icon:'⌚',name:x.name||'Watch 锻炼',meta:[x.minutes?`${Math.round(x.minutes)} 分钟`:'',x.calories?`${Math.round(x.calories)} kcal`:''].filter(Boolean).join(' · ')}));
+      const gyms=presentGymSessions((s.workouts||[]).filter(x=>x.date===date)).map(x=>({icon:'🏋',name:x.split||x.name||'健身',meta:[x.minutes?`${Math.round(x.minutes)} 分钟`:'',x.calories?`${Math.round(x.calories)} kcal`:''].filter(Boolean).join(' · ')}));
+      const healthToday=(s.health?.workouts||[]).filter(x=>x.date===date);
+      const bad=presentBadmintonSessions((s.badminton||[]).filter(x=>x.date===date), healthToday).map(x=>({icon:'🏸',name:'羽毛球',meta:[x.minutes?`${Math.round(x.minutes)} 分钟`:'',x.calories?`${Math.round(x.calories)} kcal`:''].filter(Boolean).join(' · ')}));
+      const other=otherHealthWorkouts(healthToday).map(x=>({icon:'⌚',name:x.name||'Watch 锻炼',meta:[x.minutes?`${Math.round(x.minutes)} 分钟`:'',x.calories?`${Math.round(x.calories)} kcal`:''].filter(Boolean).join(' · ')}));
       const weights=[...(s.weights||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
       this.setData({
         loading:false,
