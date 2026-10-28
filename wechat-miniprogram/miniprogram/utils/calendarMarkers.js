@@ -1,6 +1,7 @@
 const BODY_PARTS = ['胸', '肩', '背', '腿'];
 
-// Apple Watch strength imports land in workouts[] with split "健身" and no exercises.
+// Watch strength imports are stored as workouts with a generic split and no exercises.
+// They carry duration, calories, and heart rate for the user's own session.
 const GENERIC_SPLITS = new Set([
   '健身',
   '练',
@@ -21,57 +22,115 @@ function pad(n) {
   return String(n).padStart(2, '0');
 }
 
-function splitText(workout) {
-  if (!workout) return '';
-  const split = workout.split == null ? '' : String(workout.split).trim();
-  if (split) return split;
-  return workout.name == null ? '' : String(workout.name).trim();
-}
-
 function isGenericSplit(raw) {
   const text = String(raw || '').trim();
   if (!text) return true;
   return GENERIC_SPLITS.has(text) || GENERIC_SPLITS.has(text.toLowerCase());
 }
 
-// A non-standard split that is already a short Chinese label (核心, 手臂) stays readable.
-function shortExtra(raw) {
-  const cjk = String(raw || '').replace(/[^\u4e00-\u9fff]/g, '');
-  if (cjk.length >= 1 && cjk.length <= 2) return cjk;
+function hasExerciseDetail(workout) {
+  const exercises = Array.isArray(workout && workout.exercises) ? workout.exercises : [];
+  return exercises.some(exercise => {
+    if (!exercise || typeof exercise !== 'object') return false;
+    if (String(exercise.name || '').trim()) return true;
+    if (Array.isArray(exercise.setEntries) && exercise.setEntries.length) return true;
+    if (Number(exercise.weight) || Number(exercise.reps) || Number(exercise.sets)) return true;
+    return false;
+  });
+}
+
+function isImportedStrength(workout) {
+  const source = String(workout.source || '');
+  const activity = String(workout.activityType || '').toLowerCase();
+  const name = String(workout.name || '').trim();
+  return source === 'apple-health-strength'
+    || activity === 'functional_strength_training'
+    || name === '功能性力量训练'
+    || /functional strength/i.test(`${name} ${activity}`);
+}
+
+// A watch strength import with no user split and no exercises. Display-only;
+// the stored snapshot is left untouched.
+function isWatchOnlyStrength(workout) {
+  if (!workout || typeof workout !== 'object') return false;
+  const split = String(workout.split || '').trim();
+  if (BODY_PARTS.includes(split)) return false;
+  if (hasExerciseDetail(workout)) return false;
+  if (isImportedStrength(workout)) return true;
+  return isGenericSplit(split);
+}
+
+// The user's split, as a single label. Several workouts are not joined.
+function oneSplitLabel(split) {
+  const raw = String(split || '').trim();
+  if (!raw || isGenericSplit(raw)) return '';
+  const parts = BODY_PARTS.filter(part => raw.includes(part));
+  if (parts.length) return parts[0];
+  return Array.from(raw).length <= 2 ? raw : '';
+}
+
+function gymSplitLabel(workouts) {
+  const list = Array.isArray(workouts) ? workouts : [];
+  for (const workout of list) {
+    if (!workout || isWatchOnlyStrength(workout)) continue;
+    const label = oneSplitLabel(workout.split || workout.name);
+    if (label) return label;
+  }
   return '';
 }
 
-// One compact label for every gym workout on a day.
-// Body parts stay in 胸肩背腿 order so 肩 + 胸 renders as 胸肩.
-// Generic splits become 练, and only when the day has no more specific label.
-function gymSplitLabel(workouts) {
-  const list = Array.isArray(workouts) ? workouts : [];
-  if (!list.length) return '';
-  const parts = new Set();
-  const extras = [];
-  let generic = false;
-  for (const workout of list) {
-    const raw = splitText(workout);
-    const found = BODY_PARTS.filter(part => raw.includes(part));
-    if (found.length) {
-      found.forEach(part => parts.add(part));
-      continue;
-    }
-    const extra = isGenericSplit(raw) ? '' : shortExtra(raw);
-    if (extra) {
-      if (!extras.includes(extra)) extras.push(extra);
-      continue;
-    }
-    generic = true;
-  }
-  const specific = BODY_PARTS.filter(part => parts.has(part)).concat(extras).join('');
-  if (specific) return specific;
-  return generic ? '练' : '';
+function positive(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function markerLayout(label) {
-  const length = Array.from(label || '').length;
-  return { gymSize: length >= 4 ? 'long' : '' };
+function withWatchMetrics(manual, watches) {
+  const next = { ...manual };
+  for (const watch of watches) {
+    if (!positive(next.minutes) && positive(watch.minutes)) next.minutes = watch.minutes;
+    if (!positive(next.calories) && positive(watch.calories)) next.calories = watch.calories;
+    for (const key of ['watchHeartRateAvg', 'watchHeartRateMin', 'watchHeartRateMax', 'watchWorkoutId', 'watchStart', 'watchEnd']) {
+      if ((next[key] == null || next[key] === '') && watch[key] != null && watch[key] !== '') next[key] = watch[key];
+    }
+    if (!next.metricsSource && (watch.metricsSource || isImportedStrength(watch))) next.metricsSource = watch.metricsSource || 'apple-watch';
+  }
+  return next;
+}
+
+// Collapse a watch strength import into the manual session on the same day.
+// A day that only has the import stays a single metrics record, with no invented split.
+function presentGymSessions(workouts) {
+  const list = Array.isArray(workouts) ? workouts : [];
+  const watchByDate = new Map();
+  const manualDates = new Set();
+  for (const workout of list) {
+    if (!workout) continue;
+    const date = String(workout.date || '');
+    if (isWatchOnlyStrength(workout)) {
+      if (!watchByDate.has(date)) watchByDate.set(date, []);
+      watchByDate.get(date).push(workout);
+    } else {
+      manualDates.add(date);
+    }
+  }
+  const attached = new Set();
+  const out = [];
+  for (const workout of list) {
+    if (!workout) continue;
+    const date = String(workout.date || '');
+    if (isWatchOnlyStrength(workout)) {
+      if (!manualDates.has(date)) out.push(workout);
+      continue;
+    }
+    if (attached.has(date)) {
+      out.push(workout);
+      continue;
+    }
+    attached.add(date);
+    const watches = watchByDate.get(date) || [];
+    out.push(watches.length ? withWatchMetrics(workout, watches) : workout);
+  }
+  return out;
 }
 
 function sameDay(list, date) {
@@ -90,23 +149,24 @@ function buildCalendarCells({ year, monthIndex, today, snapshot }) {
     const date = `${year}-${pad(month + 1)}-${pad(day)}`;
     const dayWorkouts = sameDay(source.workouts, date);
     const meals = sameDay(source.meals, date).length;
+    // Recorded badminton entries only. Nothing is inferred from plans or other workouts.
     const bad = sameDay(source.badminton, date).length;
     const watch = sameDay(source.health && source.health.workouts, date)
       .filter(item => item.activityType !== 'functional_strength_training').length;
+    const manual = dayWorkouts.filter(item => !isWatchOnlyStrength(item)).length;
     const gymLabel = gymSplitLabel(dayWorkouts);
-    const layout = markerLayout(gymLabel);
     cells.push({
       key: date,
       date,
       day,
       today: date === today,
       meals,
-      workouts: dayWorkouts.length,
+      workouts: manual,
       bad,
       watch,
       gymLabel,
-      gymSize: layout.gymSize,
-      has: Boolean(meals || dayWorkouts.length || bad || watch)
+      gymSize: '',
+      has: Boolean(meals || manual || bad || watch)
     });
   }
   return {
@@ -117,4 +177,9 @@ function buildCalendarCells({ year, monthIndex, today, snapshot }) {
   };
 }
 
-module.exports = { gymSplitLabel, markerLayout, buildCalendarCells };
+module.exports = {
+  gymSplitLabel,
+  isWatchOnlyStrength,
+  presentGymSessions,
+  buildCalendarCells
+};
