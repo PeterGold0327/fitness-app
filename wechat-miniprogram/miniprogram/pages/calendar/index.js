@@ -1,2 +1,43 @@
-const h=require('../../utils/helpers');const app=getApp();
-Page({data:{year:0,month:0,title:'',cells:[],loading:true},onLoad(){const d=new Date();this.cursor=new Date(d.getFullYear(),d.getMonth(),1);},onShow(){this.getTabBar?.()?.setData({selected:3});if(!h.requireLogin())return;this.load();},async load(){this.snapshot=await app.getSnapshot(true);this.renderMonth();},renderMonth(){const y=this.cursor.getFullYear(),m=this.cursor.getMonth(),first=new Date(y,m,1),lead=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate(),today=h.todayKey(),cells=[];for(let i=0;i<lead;i++)cells.push({blank:true,key:`b${i}`});for(let d=1;d<=days;d++){const date=`${y}-${h.pad(m+1)}-${h.pad(d)}`,s=this.snapshot||{},meals=(s.meals||[]).filter(x=>x.date===date).length,workouts=(s.workouts||[]).filter(x=>x.date===date).length,bad=(s.badminton||[]).filter(x=>x.date===date).length,watch=(s.health?.workouts||[]).filter(x=>x.date===date&&x.activityType!=='functional_strength_training').length;cells.push({key:date,date,day:d,today:date===today,meals,workouts,bad,watch,has:meals||workouts||bad||watch});}this.setData({year:y,month:m+1,title:`${y}年 ${m+1}月`,cells,loading:false});},move(e){this.cursor=new Date(this.cursor.getFullYear(),this.cursor.getMonth()+Number(e.currentTarget.dataset.delta),1);this.renderMonth();},today(){const d=new Date();this.cursor=new Date(d.getFullYear(),d.getMonth(),1);this.renderMonth();},open(e){const date=e.currentTarget.dataset.date;if(date)wx.navigateTo({url:`/pages/day/index?date=${date}`});}});
+const h = require('../../utils/helpers');
+const { buildCalendarCells } = require('../../utils/calendarMarkers');
+const app = getApp();
+
+Page({
+  data: { year: 0, month: 0, title: '', cells: [], loading: true },
+  onLoad() {
+    const d = new Date();
+    this.cursor = new Date(d.getFullYear(), d.getMonth(), 1);
+  },
+  onShow() {
+    this.getTabBar?.()?.setData({ selected: 3 });
+    if (!h.requireLogin()) return;
+    this.load();
+  },
+  async load() {
+    this.snapshot = await app.getSnapshot(true);
+    this.renderMonth();
+  },
+  renderMonth() {
+    const view = buildCalendarCells({
+      year: this.cursor.getFullYear(),
+      monthIndex: this.cursor.getMonth(),
+      today: h.todayKey(),
+      snapshot: this.snapshot || {}
+    });
+    this.setData({ ...view, loading: false });
+  },
+  move(e) {
+    const delta = Number(e.currentTarget.dataset.delta);
+    this.cursor = new Date(this.cursor.getFullYear(), this.cursor.getMonth() + delta, 1);
+    this.renderMonth();
+  },
+  today() {
+    const d = new Date();
+    this.cursor = new Date(d.getFullYear(), d.getMonth(), 1);
+    this.renderMonth();
+  },
+  open(e) {
+    const date = e.currentTarget.dataset.date;
+    if (date) wx.navigateTo({ url: `/pages/day/index?date=${date}` });
+  }
+});

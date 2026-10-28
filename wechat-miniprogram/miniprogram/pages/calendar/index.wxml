@@ -1,1 +1,39 @@
-<view class="page"><view class="cal-head"><view><view class="eyebrow">CALENDAR</view><view class="title">日历</view></view><view class="cal-nav"><view data-delta="-1" bindtap="move">‹</view><view class="today" bindtap="today">今天</view><view data-delta="1" bindtap="move">›</view></view></view><view class="month-title">{{title}}</view><view class="week"><text>一</text><text>二</text><text>三</text><text>四</text><text>五</text><text>六</text><text>日</text></view><view class="calendar surface"><view wx:for="{{cells}}" wx:key="key" class="cell {{item.blank?'blank':''}} {{item.today?'today-cell':''}} {{item.has?'has-data':''}}" data-date="{{item.date}}" bindtap="open"><block wx:if="{{!item.blank}}"><view class="day-num">{{item.day}}</view><view class="signals"><i wx:if="{{item.workouts}}" class="dot gym"></i><i wx:if="{{item.bad}}" class="dot bad"></i><i wx:if="{{item.meals}}" class="dot meal"></i><i wx:if="{{item.watch}}" class="dot watch"></i></view></block></view></view><view class="legend"><text><i class="dot gym"></i>健身</text><text><i class="dot bad"></i>羽毛球</text><text><i class="dot meal"></i>饮食</text><text><i class="dot watch"></i>其他运动</text></view><view class="hint">点任意一天，就能一起看当天运动和饮食。</view></view>
+<view class="page">
+  <view class="cal-head">
+    <view>
+      <view class="eyebrow">CALENDAR</view>
+      <view class="title">日历</view>
+    </view>
+    <view class="cal-nav">
+      <view data-delta="-1" bindtap="move">‹</view>
+      <view class="today" bindtap="today">今天</view>
+      <view data-delta="1" bindtap="move">›</view>
+    </view>
+  </view>
+  <view class="month-title">{{title}}</view>
+  <view class="week">
+    <text>一</text><text>二</text><text>三</text><text>四</text><text>五</text><text>六</text><text>日</text>
+  </view>
+  <view class="calendar surface">
+    <view wx:for="{{cells}}" wx:key="key" class="cell {{item.blank?'blank':''}} {{item.today?'today-cell':''}} {{item.has?'has-data':''}}" data-date="{{item.date}}" bindtap="open">
+      <block wx:if="{{!item.blank}}">
+        <view class="day-row">
+          <view class="day-num">{{item.day}}</view>
+          <image wx:if="{{item.bad}}" class="shuttle" src="/images/shuttlecock.png" mode="aspectFit"/>
+        </view>
+        <view class="signals">
+          <view wx:if="{{item.gymLabel}}" class="gym-label {{item.gymSize}}">{{item.gymLabel}}</view>
+          <i wx:if="{{item.meals}}" class="dot meal"></i>
+          <i wx:if="{{item.watch}}" class="dot watch"></i>
+        </view>
+      </block>
+    </view>
+  </view>
+  <view class="legend">
+    <view class="legend-item"><text class="legend-part">胸</text><text>健身</text></view>
+    <view class="legend-item"><image class="legend-shuttle" src="/images/shuttlecock.png" mode="aspectFit"/><text>羽毛球</text></view>
+    <view class="legend-item"><i class="dot meal"></i><text>饮食</text></view>
+    <view class="legend-item"><i class="dot watch"></i><text>其他运动</text></view>
+  </view>
+  <view class="hint">点任意一天，就能一起看当天运动和饮食。</view>
+</view>
