@@ -108,6 +108,7 @@ Page({
       await this.load();
     }catch(e){
       wx.showToast({title:'体重记录失败',icon:'none'});
+    }finally{
       this.setData({weightSaving:false});
     }
   },
